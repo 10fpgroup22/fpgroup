@@ -1,0 +1,31 @@
+form.auth{
+	display: flex;
+	flex-direction: column;
+	width: 250px;
+	padding: 10px;
+	border: 2px solid #bf40bf;
+	border-radius: 15px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+}
+
+form.auth > input{
+	background-color: transparent;
+	border: none;
+	border-bottom: 2px solid skyblue;
+	padding-left: 5px;
+	padding-bottom: 3px;
+	margin-bottom: 5px;
+}
+
+form.auth > h2.form-title{
+	text-align: center;
+	margin-bottom: 8px;
+}
+
+div.field{
+	display: flex;
+	flex-direction: row;
+}

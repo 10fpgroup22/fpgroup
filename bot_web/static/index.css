@@ -1,0 +1,45 @@
+*{
+	margin: 0;
+	padding: 0;
+	font-family: "Lucida Handwriting", cursive;
+	outline: none;
+}
+
+body{
+	min-height: 100vh;
+	min-width: 100vw;
+}
+
+a{
+	text-decoration: none;
+}
+
+ul.navigation{
+	list-style-type: none;
+	height: 40px;
+	background-color: rgb(13, 23, 33);
+}
+
+li.link{
+	float: left;
+	height: 40px;
+}
+
+li.link > a{
+	display: flex;
+	flex-direction: column;
+	text-align: center;
+	justify-content: center;
+	padding: 0 16px;
+	height: 100%;
+	color: #f1f1f1;
+	transition: all .3s;
+}
+
+li.link > a:not(.active):hover{
+	background-color: black;
+}
+
+li.link > a.active{
+	background-color: #04aa6d;
+}
