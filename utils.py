@@ -126,9 +126,9 @@ def dispatch(event: str, *args, **kwargs):
 
 async def start():
     from bot_web import run
+    await run(block=False)
     asyncio.create_task(ds.start(getenv("DISCORD")))
     await tg.start()
-    await run(block=False)
 
     while True:
         try:

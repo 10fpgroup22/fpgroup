@@ -1,7 +1,17 @@
 import asyncio
+import inspect
+import aiohttp_jinja2 as aiojinja
+
+from aiohttp import web, hdrs
+from jinja2 import FileSystemLoader, pass_context
+from os.path import realpath, dirname, join
+from typing import Optional, Union, Type
 
 if not hasattr(asyncio, 'coroutine'):
 	def coroutine(func):
+		if inspect.iscoroutinefunction(func):
+			return func
+
 		async def wrapper(*args, **kwargs):
 			return func(*args, **kwargs)
 
@@ -10,12 +20,7 @@ if not hasattr(asyncio, 'coroutine'):
 
 		return wrapper
 
-import aiohttp_jinja2 as aiojinja
-
-from aiohttp import web, hdrs
-from jinja2 import FileSystemLoader, pass_context
-from os.path import realpath, dirname, join
-from typing import Optional, Union, Type
+	asyncio.coroutine = coroutine
 
 APP_KEY = "aiojinja2"
 PATH = realpath(dirname(__name__))

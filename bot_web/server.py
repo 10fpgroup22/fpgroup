@@ -1,6 +1,7 @@
-import asyncio
-
 from .minilib import *
+from os import getenv
+
+__all__ = ["run"]
 
 path = realpath(dirname(__file__))
 
@@ -45,9 +46,11 @@ async def telegram(request):
 
 
 async def run(block=True):
+	from pyngrok import ngrok, conf
 	from socket import socket, SOCK_DGRAM
 
 	s = socket(type=SOCK_DGRAM)
+	ngconf = conf.PyngrokConfig(ngrok_version="v3", auth_token=getenv("NGROK"))
 
 	try:
 		s.connect(('10.255.255.255', 1))
@@ -60,9 +63,14 @@ async def run(block=True):
 	site = web.TCPSite(runner, ip, 8080)
 	await site.start()
 
+	tunner_ip = ngrok.connect(site.name, pyngrok_config=ngconf).public_url
+	print(f"Local ip: {site.name}\nGlobal ip: {tunnel_ip}")
+
 	if block:
 		while True:
 			await asyncio.sleep(1)
+
+	return site
 
 
 app.add_routes(routes)
