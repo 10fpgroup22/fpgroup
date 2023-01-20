@@ -1,3 +1,15 @@
+import asyncio
+
+if not hasattr(asyncio, 'coroutine'):
+	def coroutine(func):
+		async def wrapper(*args, **kwargs):
+			return func(*args, **kwargs)
+
+		wrapper.__name__ = func.__name__
+		wrapper.__repr__ = func.__repr__
+
+		return wrapper
+
 import aiohttp_jinja2 as aiojinja
 
 from aiohttp import web, hdrs

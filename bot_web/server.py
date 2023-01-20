@@ -45,10 +45,21 @@ async def telegram(request):
 
 
 async def run(block=True):
+	from socket import socket, SOCK_DGRAM
+
+	s = socket(type=SOCK_DGRAM)
+
+	try:
+		s.connect(('10.255.255.255', 1))
+		ip = s.getsockname()[0]
+	except:
+		ip = '127.0.0.1'
+
 	runner = web.AppRunner(app)
 	await runner.setup()
-	site = web.TCPSite(runner, 'localhost', 8080)
+	site = web.TCPSite(runner, ip, 8080)
 	await site.start()
+
 	if block:
 		while True:
 			await asyncio.sleep(1)
