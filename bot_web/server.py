@@ -63,7 +63,7 @@ async def run(block=True):
 	site = web.TCPSite(runner, ip, 8080)
 	await site.start()
 
-	tunner_ip = ngrok.connect(site.name, pyngrok_config=ngconf).public_url
+	tunnel_ip = ngrok.connect(site.name, pyngrok_config=ngconf).public_url
 	print(f"Local ip: {site.name}\nGlobal ip: {tunnel_ip}")
 
 	if block:
