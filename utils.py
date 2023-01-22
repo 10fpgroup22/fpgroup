@@ -32,7 +32,7 @@ except (IOError, JSONDecodeError):
         settings = Settings()
         chats = {}
         left = {}
-        dump({"settings": settings, "chats": chats, left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+        dump({"settings": settings, "chats": chats, "left": left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
 with tg:
     global admins
@@ -152,6 +152,6 @@ async def start():
             pass
         await asyncio.sleep(.1)
         with open(join(sdir, f"{tg.name}.json"), 'w', encoding="utf-8") as file:
-            dump({"settings": settings, "leave_tag_all": left}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+            dump({"settings": settings, "chats": chats, "left": left}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
     await tg.stop()
