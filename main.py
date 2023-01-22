@@ -39,26 +39,26 @@ async def new_chat_member(_, msg):
         print(f"Occurred <{rpc}>")
 
 
-@tg.on_message(filters.chat("fpg_tournament") & ~filters.me)
-async def telegram_channel_handler(_, msg):
-    if bool(msg.service):
-        return await msg.delete()
+# @tg.on_message(filters.chat("fpg_tournament") & ~filters.me)
+# async def telegram_channel_handler(_, msg):
+#     if bool(msg.service):
+#         return await msg.delete()
 
-    news = await ds.fetch_channel(news_id)
-    text, photos = '', None
+#     news = await ds.fetch_channel(news_id)
+#     text, photos = '', None
 
-    if bool(msg.text):
-        text = msg.text.markdown
-    elif bool(msg.caption):
-        text = msg.caption.markdown
-    elif bool(msg.poll):
-        text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {opt.text}" for x, opt in enumerate(msg.poll.options, 1))
+#     if bool(msg.text):
+#         text = msg.text.markdown
+#     elif bool(msg.caption):
+#         text = msg.caption.markdown
+#     elif bool(msg.poll):
+#         text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {opt.text}" for x, opt in enumerate(msg.poll.options, 1))
 
-    text += '\n' if bool(text) else ''
+#     text += '\n' if bool(text) else ''
 
-    await news.send("||@everyone||\n{0}> {1} здесь <https://t.me/fpg_tournament/{2}>".format(
-        text, ('Голосуй' if bool(msg.poll) else 'Больше'), msg.id
-    ), embeds=photos)
+#     await news.send("||@everyone||\n{0}> {1} здесь <https://t.me/fpg_tournament/{2}>".format(
+#         text, ('Голосуй' if bool(msg.poll) else 'Больше'), msg.id
+#     ))
 
 
 @tg.on_message(filters.private & filters.command('start'))
@@ -66,13 +66,19 @@ async def start_private(_, msg):
     await tg.send_photo(msg.chat.id, **reply["menu"])
 
 
-@tg.on_message(filters.command(['all', f'all@{me.username}']) & filters.user(admins) & filters.group)
+@tg.on_message(filters.command(['all', f'all@{me.username}']) & filters.group)
 async def all_group(_, msg: types.Message):
-    await tg.send_message(
-        msg.chat.id,
-        "Брат, я тебя призываю\n" +
-        "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>" async for u in msg.chat.get_members()])
-    )
+    if msg.from_user.id in admins:
+        await tg.send_message(
+            msg.chat.id,
+            "Брат, я тебя призываю\n" +
+            "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>" async for u in msg.chat.get_members()])
+        )
+
+    try:
+        await msg.delete()
+    except err.RPCError as rpc:
+        print(f"Occurred <{rpc}>")
 
 
 @tg.on_message(filters.command('settings') & filters.user("python_bot_coder") & filters.private)

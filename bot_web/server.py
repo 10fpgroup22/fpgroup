@@ -38,13 +38,6 @@ async def register_callback(request):
 	data = await request.post()
 
 
-@routes.get('/telegram')
-@template("index.html")
-async def telegram(request):
-	data = request.query
-	print(data)
-
-
 async def run(block=True):
 	runner = web.AppRunner(app)
 	await runner.setup()
