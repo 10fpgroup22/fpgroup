@@ -130,10 +130,7 @@ async def run_func(*funcs, timeout=30):
     result = []
     try:
         for func in funcs:
-            res = func()
-            if inspect.iscoroutinefunction(func):
-                res = await res
-            result.append(res)
+            result.append(await func())
     except BaseException as e:
         print("Something went wrong:", e)
 
