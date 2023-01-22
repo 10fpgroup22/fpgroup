@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 
 from deps import Settings
 from discord import Client as DSClient, Intents
@@ -124,12 +125,19 @@ async def edit_photo(msg, photo="", caption="", reply_markup=None):
         return msg
 
 
-async def run_func(func, timeout=30):
+async def run_func(*funcs, timeout=30):
     await asyncio.sleep(timeout)
+    result = []
     try:
-        await func()
+        for func in funcs:
+            res = func()
+            if inspect.iscoroutinefunction(func):
+                res = await res
+            result.append(res)
     except BaseException as e:
         print("Something went wrong:", e)
+
+    return result
 
 
 def dispatch(event: str, *args, **kwargs):

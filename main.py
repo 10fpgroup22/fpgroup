@@ -73,7 +73,8 @@ async def all_group(_, msg: types.Message):
         await tg.send_message(
             msg.chat.id,
             "Брат, я тебя призываю\n" +
-            "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>" async for u in msg.chat.get_members() if str(u.user.id) not in chat])
+            "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>"
+                     async for u in msg.chat.get_members() if str(u.user.id) not in chat and not u.user.is_bot])
         )
 
     try:
@@ -92,9 +93,7 @@ async def leave_tag_all(_, msg):
         if msg.sender_chat:
             text = f"Так как ты являешся --анонимным-- администратором, я итак не могу отметить тебя"
 
-    run(run_func, (await msg.reply(text)).delete, 30)
-
-    await msg.delete()
+    run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
 
 
 @tg.on_message(filters.command(['add', f'add@{me.username}']) & filters.group)
@@ -110,8 +109,7 @@ async def add_tag_all(_, msg):
         if msg.sender_chat:
             text = f"Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
 
-    run(run_func, (await msg.reply(text)).delete, 30)
-    await msg.delete()
+    run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
 
 
 @tg.on_message(filters.command('settings') & filters.user("python_bot_coder") & filters.private)
