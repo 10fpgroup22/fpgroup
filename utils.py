@@ -24,11 +24,15 @@ news_id = 1038752367123898459
 try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
+        chats = dt.get('chats', {})
         settings = Settings.load(dt.get("settings", {"_": "Settings"}))
+        left = dt.get('left', {})
 except (IOError, JSONDecodeError):
     with open(join(sdir, f'{tg.name}.json'), 'w', encoding='utf-8') as fl:
         settings = Settings()
-        dump({"settings": settings}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+        chats = {}
+        left = {}
+        dump({"settings": settings, "chats": chats, left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
 with tg:
     global admins
@@ -82,6 +86,10 @@ markups = {
     "rights": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ]),
+    "rights_moder": types.InlineKeyboardMarkup([
+        [types.InlineKeyboardButton("➕Создать пост", callback_data="create_post")],
+        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
+    ]),
     "info": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("Мы в соц. сетях", callback_data="social")],
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
@@ -92,6 +100,10 @@ markups = {
     ],
     "settings": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("Турнир", callback_data="s_tournir")]
+    ]),
+    "create_post": types.InlineKeyboardMarkup([
+        [types.InlineKeyboardButton("Изменить текст📝", callback_data="post_text")],
+        [types.InlineKeyboardButton("Добавить кнопку➕", callback_data="post_add_button")]
     ])
 }
 
@@ -140,6 +152,6 @@ async def start():
             pass
         await asyncio.sleep(.1)
         with open(join(sdir, f"{tg.name}.json"), 'w', encoding="utf-8") as file:
-            dump({"settings": settings}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+            dump({"settings": settings, "leave_tag_all": left}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
     await tg.stop()

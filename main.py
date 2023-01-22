@@ -39,7 +39,7 @@ async def new_chat_member(_, msg):
         print(f"Occurred <{rpc}>")
 
 
-# @tg.on_message(filters.chat("fpg_tournament") & ~filters.me)
+# @tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
 # async def telegram_channel_handler(_, msg):
 #     if bool(msg.service):
 #         return await msg.delete()
@@ -56,8 +56,8 @@ async def new_chat_member(_, msg):
 
 #     text += '\n' if bool(text) else ''
 
-#     await news.send("||@everyone||\n{0}> {1} здесь <https://t.me/fpg_tournament/{2}>".format(
-#         text, ('Голосуй' if bool(msg.poll) else 'Больше'), msg.id
+#     await news.send("||@everyone||\n{0}> {1} здесь <{2}>".format(
+#         text, ('Голосуй' if bool(msg.poll) else 'Больше'), msg.link
 #     ))
 
 
@@ -68,17 +68,50 @@ async def start_private(_, msg):
 
 @tg.on_message(filters.command(['all', f'all@{me.username}']) & filters.group)
 async def all_group(_, msg: types.Message):
-    if msg.from_user.id in admins:
+    if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat:
+        chat = left.setdefault(str(msg.chat.id), [])
         await tg.send_message(
             msg.chat.id,
             "Брат, я тебя призываю\n" +
-            "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>" async for u in msg.chat.get_members()])
+            "".join([f"<a href='tg://user?id={u.user.id}'>{choice(emojis)}</a>" async for u in msg.chat.get_members() if str(u.user.id) not in chat])
         )
 
     try:
         await msg.delete()
     except err.RPCError as rpc:
         print(f"Occurred <{rpc}>")
+
+
+@tg.on_message(filters.command(['leave', f'leave@{me.username}']) & filters.group)
+async def leave_tag_all(_, msg):
+    group = left.setdefault(str(msg.chat.id), [])
+    try:
+        group.append(str(msg.from_user.id))
+        text = f"Теперь в этой группе я тебя не отмечу"
+    except err.RPCError as rpc:
+        if msg.sender_chat:
+            text = f"Так как ты являешся --анонимным-- администратором, я итак не могу отметить тебя"
+
+    run(run_func, (await msg.reply(text)).delete, 30)
+
+    await msg.delete()
+
+
+@tg.on_message(filters.command(['add', f'add@{me.username}']) & filters.group)
+async def add_tag_all(_, msg):
+    group = left.setdefault(str(msg.chat.id), [])
+    try:
+        if str(msg.from_user.id) in group:
+            group.remove(str(msg.from_user.id))
+            text = f"С этого момента я буду отмечать тебя в группе"
+        else:
+            text = f"Я итак отмечаю тебя в группе, не спамь пожалуйста"
+    except err.RPCError as rpc:
+        if msg.sender_chat:
+            text = f"Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
+
+    run(run_func, (await msg.reply(text)).delete, 30)
+    await msg.delete()
 
 
 @tg.on_message(filters.command('settings') & filters.user("python_bot_coder") & filters.private)
@@ -115,6 +148,13 @@ async def callback_query(_, qry):
             markup = list(filter(bool, map(lambda x: (None if x[1] else markups["subscribe"][x[0]]), enumerate(verified))))
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
+    elif qry.data == "create_post":
+        pass
+    elif qry.data == "rights":
+        photo, caption, markup = photos["rights"], captions["rights"], markups["rights"]
+        if user.id in admins:
+            caption = ""
+            markup = markups["rights_moder"]
     elif qry.data == "social":
         photo, markup = photos["social"], [
             [types.InlineKeyboardButton(txt, url=url)]
