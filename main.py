@@ -128,7 +128,7 @@ async def callback_query(_, qry):
 
         for x, chat in enumerate(["fpg_chat", "fpg_tournament"]):
             try:
-                verified[x] = (await tg.get_chat_member(chat, user.id)).status in [enums.ChatMemberStatus.LEFT, enums.ChatMemberStatus.BANNED]
+                verified[x] = (await tg.get_chat_member(chat, user.id)).status not in [enums.ChatMemberStatus.LEFT, enums.ChatMemberStatus.BANNED]
             except err.RPCError as rpc:
                 print(f"Occurred <{rpc}>")
 
@@ -147,7 +147,7 @@ async def callback_query(_, qry):
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
     elif qry.data == "create_post":
-        pass
+        photo, markup = photos["rights"], markups["create_post"]
     elif qry.data == "rights":
         photo, caption, markup = photos["rights"], captions["rights"], markups["rights"]
         if user.id in admins:
@@ -175,6 +175,20 @@ async def callback_query(_, qry):
             ]
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="settings")])
+    elif qry.data.endswith("_tournir"):
+        if qry.data.startswith("d"):
+            del chats[str(msg.chat.id)]
+            settings.set("Турнир", "Ссылка", "")
+            qry.data = "s_tournir"
+            return await callback_query(tg, qry)
+
+        chats[str(msg.chat.id)] = qry.data
+        caption = "Введите ссылку на турнир"
+        markup = [[types.InlineKeyboardButton("<< Отмена", callback_data="s_tournir_cancel")]]
+    elif qry.data == "s_tournir_cancel":
+        del chats[str(msg.chat.id)]
+        qry.data = "s_tournir"
+        return await callback_query(tg, qry)
     elif qry.data in reply:
         photo, caption, markup = photos.get(qry.data, photos["menu"]), \
             captions.get(qry.data, ""), markups.get(qry.data, [])
