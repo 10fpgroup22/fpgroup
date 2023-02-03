@@ -2,7 +2,7 @@ import asyncio
 import inspect
 
 from deps import Settings
-from discord import Client as DSClient, Intents
+from discord import Client as DSClient, Intents, File
 from json import dump, load, JSONDecodeError
 from os import environ
 from os.path import abspath, dirname, join
@@ -53,7 +53,8 @@ captions = {
                "P.S. Нажимая на кнопку 'Регистрация' Вы соглашаетесь с нашими правилами",
     "no_tournir": "В данный момент не проводится турнир. Подождите ещё чуть-чуть, мы его скоро анонсируем...",
     "info": "Найдите и прочитайте интересующую вас информацию. А если не найдёте, то можете задать вопрос ему => <a href='https://t.me/fpgfeedBot'>бот обратной связи</a>",
-    "subscribe": "Для того чтобы участвовать в турнире нужно быть подписаным на:"
+    "subscribe": "Для того чтобы участвовать в турнире нужно быть подписаным на:",
+    "discord_send": "Отправь ссылку на пост или пост сюда"
 }
 
 photos = {
@@ -88,7 +89,7 @@ markups = {
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ]),
     "rights_moder": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("➕Создать пост", callback_data="create_post")],
+        [types.InlineKeyboardButton("Отправить пост в Дискорд", callback_data="discord_send")],
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ]),
     "info": types.InlineKeyboardMarkup([
@@ -102,9 +103,12 @@ markups = {
     "settings": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("Турнир", callback_data="s_tournir")]
     ]),
-    "create_post": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("Изменить текст📝", callback_data="post_text")],
-        [types.InlineKeyboardButton("Добавить кнопку➕", callback_data="post_add_button")]
+    "discord_send": types.InlineKeyboardMarkup([
+        [types.InlineKeyboardButton("<< Назад", callback_data="rights")]
+    ]),
+    "discord_send_post": types.InlineKeyboardMarkup([
+        [types.InlineKeyboardButton("❌Удалить❌", callback_data="discord_discard")],
+        [types.InlineKeyboardButton("Отправить✅", callback_data="discord_approve")]
     ])
 }
 
@@ -117,9 +121,9 @@ reply = {
 }
 
 
-async def edit_photo(msg, photo="", caption="", reply_markup=None):
+async def edit_media(msg, media="", caption="", reply_markup=None):
     try:
-        return await msg.edit_media(types.InputMediaPhoto(media=photo, caption=caption), reply_markup=reply_markup)
+        return await msg.edit_media(types.InputMedia(media=photo, caption=caption), reply_markup=reply_markup)
     except err.RPCError as e:
         print("Something where occurred:", e)
         return msg
@@ -137,10 +141,6 @@ async def run_func(*funcs, timeout=30):
     return result
 
 
-def dispatch(event: str, *args, **kwargs):
-    events.put({"event": event, "args": args, "kwargs": kwargs})
-
-
 async def start():
     from bot_web import run
     await run(block=False)
@@ -148,13 +148,6 @@ async def start():
     await tg.start()
 
     while True:
-        try:
-            event = events.get(block=False)
-            if event:
-                event, args, kwargs = event["event"], event["args"], event["kwargs"]
-                dsp.dispatch(event, *args, **kwargs)
-        except BaseException as e:
-            pass
         await asyncio.sleep(.1)
         with open(join(sdir, f"{tg.name}.json"), 'w', encoding="utf-8") as file:
             dump({"settings": settings, "chats": chats, "left": left}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)

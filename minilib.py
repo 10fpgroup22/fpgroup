@@ -1,24 +1,36 @@
 import asyncio
+import atexit
 import inspect
 import re
 
-from concurrent.futures import ThreadPoolExecutor, Executor
+from concurrent.futures import Future
 from json import loads
+from queue import Queue
+from threading import Thread
 from typing import Any, Optional, Union, Iterable, Coroutine, Callable
 
 __all__ = ["Dispatcher", "Loader", "Function", "build", "get_pattern", "run"]
 
 Function = Union[Callable, Coroutine]
-_global_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="Builder-")
+_queue = Queue()
 
 
-def _repr_(func: Function):
-	def __repr():
-		return f"{func.__name__}{inspect.signature(func)}"
+class _Item:
+	def __init__(self, future, func, args, kwargs):
+		self.future = future
+		self.func = func
+		self.args = args
+		self.kwargs = kwargs
 
-	func.__repr__ = __repr
-
-	return func
+	def run(self, loop: asyncio.AbstractEventLoop):
+		try:
+			result = self.func(*self.args, **self.kwargs)
+			if inspect.iscoroutinefunction(self.func):
+				result = loop.run_until_complete(result)
+		except BaseException as e:
+			return self.future.set_exception(e)
+		
+		self.future.set_result(result)
 
 
 def build(obj: Function, *args, **kwargs):
@@ -54,27 +66,47 @@ def build(obj: Function, *args, **kwargs):
 	return [obj, ar, kw]
 
 
-def _run_(func: Coroutine, *args, **kwargs):
-	return asyncio.run(func(*args, **kwargs))
+def _worker(*, queue: Queue = _queue):
+	loop = asyncio.new_event_loop()
+	while True:
+		item = queue.get(block=True)
+		if item is not None:
+			item.run(loop)
+			del item
 
 
-def run(funcs: Union[Function, Iterable[Function]], *args, executor: Executor = _global_executor, **kwargs):
+def init(queue: Queue = _queue):
+	global _queue
+	_queue = queue
+	worker = Thread(target=_worker, args=(queue,))
+	worker.start()
+	atexit.register(worker.join, timeout=1)
+
+
+def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
+	assert len(funcs) > 0
 	results = []
-	funcs = list(map(lambda fn: (build(fn, *args, **kwargs)),
+	items = list(map(lambda fn: (_Item(Future(), *build(fn, *args, **kwargs))),
 				 (funcs if isinstance(funcs, Iterable) else [funcs])))
 
-	for fn, ar, kw in funcs:
-		coro = bool(inspect.iscoroutine(fn) or inspect.iscoroutinefunction(fn))
-		res = executor.submit(_run_, fn, *ar, **kw) if coro else executor.submit(fn, *ar, **kw)
+	for item in items:
 		try:
-			res = res.result(timeout=5)
-		except TimeoutError:
-			pass
-		finally:
-			results.append((res, fn))
+			_queue.put(item)
+			result = item.future.result(timeout=5)
+		except BaseException:
+			result = item.future
+		results.append(result)
 
-	del funcs
-	return results if len(results) != 1 else results[0]
+	return results if len(results) > 1 else results[0]
+
+
+def _repr_(func: Function):
+	def __repr():
+		return f"<{func.__name__}{inspect.signature(func)}>"
+
+	func.__repr__ = __repr
+
+	return func
 
 
 def get_pattern(string):
@@ -91,10 +123,8 @@ def get_pattern(string):
 class Dispatcher:
 	_events: dict[str, set[Function]] = {"*": set()}
 	_patterns: dict[str, re.Pattern] = {"*": re.compile(get_pattern("*"))}
-	_executor: Executor = _global_executor
 
-	def __init__(self, *dispatchers: Iterable[tuple[str, Iterable[Function]]], executor: Executor = _global_executor):
-		self._executor = executor
+	def __init__(self, *dispatchers: Iterable[tuple[str, Iterable[Function]]]):
 		if dispatchers:
 			self.add_events(dispatchers)
 
@@ -144,7 +174,7 @@ class Dispatcher:
 			_wrapper_.__name__ = wrapper.__name__
 			_wrapper_.__repr__ = wrapper.__repr__
 
-			return run(_wrapper_, event_or_func, executor=self._executor)
+			return run(_wrapper_, event_or_func)
 
 		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper(event_or_func)
 
@@ -160,7 +190,7 @@ class Dispatcher:
 			patterned.discard(event)
 		patterned = list(patterned)
 		kwargs["patterned"] = patterned if len(patterned) > 1 else patterned.pop(0)
-		return run(funcs, args, kwargs, executor=self._executor)
+		return run(funcs, args, kwargs)
 
 	def dispatcher(self, event_or_func: Optional[Union[str, Function]], *, dispatcher_first: bool = True):
 		def wrapper(func: Function):
@@ -169,12 +199,12 @@ class Dispatcher:
 			if dispatcher_first:
 				name = func.__name__
 				def wrapped(*args, **kwargs):
-					kwargs[f"{name}__args"] = run(func, args, kwargs, executor=self._executor)
+					kwargs[f"{name}__args"] = run(func, args, kwargs)
 					return (kwargs[f"{name}__args"], self.dispatch(event, args, kwargs))
 			else:
 				def wrapped(*args, **kwargs):
 					kwargs[f"{event}__args"] = self.dispatch(event, args, kwargs)
-					return (run(func, args, kwargs, executor=self._executor), kwargs[f"{event}__args"])
+					return (run(func, args, kwargs), kwargs[f"{event}__args"])
 
 			if inspect.iscoroutinefunction(func):
 				async def _wrapped_(*args, **kwargs):
@@ -197,7 +227,7 @@ class Dispatcher:
 			_wrapper_.__name__ = wrapper.__name__
 			_wrapper_.__repr__ = wrapper.__repr__
 
-			return run(_wrapper_, event_or_func, executor=self._executor)
+			return run(_wrapper_, event_or_func)
 
 		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper
 

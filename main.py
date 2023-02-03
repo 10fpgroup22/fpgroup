@@ -1,9 +1,10 @@
-from minilib import Dispatcher, run
+import minilib
+
 from pyrogram import enums, filters, types, errors as err
 from random import choice
 from utils import *
 
-dsp = Dispatcher()
+minilib.init()
 
 
 @tg.on_message(filters.chat(group_id) & filters.service, group=-1)
@@ -26,7 +27,7 @@ async def new_chat_member(_, msg):
         msg.chat.id,
         f"Давайте поприветствуем нового участника нашей группы - <a href='tg://user?id={msg.from_user.id}'>{msg.from_user.first_name}</a>"
     )
-    run(run_func, welcome.delete, 30)
+    minilib.run(run_func, welcome.delete, 30)
     try:
         await tg.send_message(
             msg.from_user.id,
@@ -37,28 +38,6 @@ async def new_chat_member(_, msg):
         )
     except err.RPCError as rpc:
         print(f"Occurred <{rpc}>")
-
-
-# @tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
-# async def telegram_channel_handler(_, msg):
-#     if bool(msg.service):
-#         return await msg.delete()
-
-#     news = await ds.fetch_channel(news_id)
-#     text, photos = '', None
-
-#     if bool(msg.text):
-#         text = msg.text.markdown
-#     elif bool(msg.caption):
-#         text = msg.caption.markdown
-#     elif bool(msg.poll):
-#         text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {opt.text}" for x, opt in enumerate(msg.poll.options, 1))
-
-#     text += '\n' if bool(text) else ''
-
-#     await news.send("||@everyone||\n{0}> {1} здесь <{2}>".format(
-#         text, ('Голосуй' if bool(msg.poll) else 'Больше'), msg.link
-#     ))
 
 
 @tg.on_message(filters.private & filters.command('start'))
@@ -93,7 +72,7 @@ async def leave_tag_all(_, msg):
         if msg.sender_chat:
             text = f"Так как ты являешся --анонимным-- администратором, я итак не могу отметить тебя"
 
-    run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
+    minilib.run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
 
 
 @tg.on_message(filters.command(['add', f'add@{me.username}']) & filters.group)
@@ -109,7 +88,7 @@ async def add_tag_all(_, msg):
         if msg.sender_chat:
             text = f"Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
 
-    run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
+    minilib.run(run_func, (await msg.reply(text)).delete, msg.delete, timeout=30)
 
 
 @tg.on_message(filters.command('settings') & filters.user("python_bot_coder") & filters.private)
@@ -117,13 +96,51 @@ async def settings_menu(_, msg):
     await tg.send_photo(msg.chat.id, **reply["settings"])
 
 
+@tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
+async def telegram_channel_handler(_, msg):
+    kwargs = {"reply_markup": markups["discord_send_post"]}
+
+    if bool(msg.text):
+        text = msg.text
+        method = "send_message"
+    elif bool(msg.media_group_id):
+        text = msg.caption
+        method = "send_media_group"
+    elif bool(msg.poll):
+        text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
+
+    text = f"||@everyone||{('\n' + text.markdown) if bool(text) else ''}\n" \
+        f"> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь {msg.link}"
+
+    if "media" in method:
+        kwargs["media"] = list(map(lambda m: (types.InputMedia(
+                                                  media=m.dowload(in_memory=True, block=False),
+                                                  caption=text)
+                                              ),
+                               await msg.get_media_group()))
+    else:
+        kwargs["text"] = text
+
+    await getattr(tg, method)(
+        1695355296, **kwargs
+    )
+
+
+@tg.on_message(filters.text & filters.private)
+async def private_handler(_, msg):
+    if chats.get(str(msg.chat.id), "") == "discord_send":
+        del chats[str(msg.chat.id)]
+
+
 @tg.on_callback_query()
 async def callback_query(_, qry):
-    photo, caption, markup = photos["menu"], "", []
+    photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
     msg, user = qry.message, qry.from_user
 
+    if str(msg.chat.id) in chats:
+        del chats[str(msg.chat.id)]
+
     if qry.data == "tournir":
-        photo, markup = photos["tournir"], []
         verified = [False, False]
 
         for x, chat in enumerate(["fpg_chat", "fpg_tournament"]):
@@ -135,7 +152,7 @@ async def callback_query(_, qry):
         if all(verified):
             url = settings.get("Турнир", "Ссылка")
             if url:
-                caption, markup = captions["tournir"], [
+                markup = [
                     [types.InlineKeyboardButton("Регистрация", url=url)],
                     [types.InlineKeyboardButton("Правила", url="https://telegra.ph/Pravila-turnira-01-03")]
                 ]
@@ -146,15 +163,24 @@ async def callback_query(_, qry):
             markup = list(filter(bool, map(lambda x: (None if x[1] else markups["subscribe"][x[0]]), enumerate(verified))))
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
-    elif qry.data == "create_post":
-        photo, markup = photos["rights"], markups["create_post"]
-    elif qry.data == "rights":
-        photo, caption, markup = photos["rights"], captions["rights"], markups["rights"]
-        if user.id in admins:
-            caption = ""
-            markup = markups["rights_moder"]
+    elif qry.data.startswith("discord"):
+        if qry.data.endswith("approve"):
+            news = await ds.fetch_channel(news_id)
+            files = None
+
+            if msg.media_group_id:
+                files = list(map(lambda m: (File(m.download(in_memory=True, block=False))),
+                             await msg.get_media_group()))
+
+            await news.send(msg.text, files=files)
+        return await msg.delete()
+    elif qry.data == "rights" and user.id in admins:
+        caption = ""
+        markup = markups["rights_moder"]
+    elif qry.data == "discord_send":
+        chats[str(msg.chat.id)] = qry.data
     elif qry.data == "social":
-        photo, markup = photos["social"], [
+        markup = [
             [types.InlineKeyboardButton(txt, url=url)]
             for txt, url in settings.iter_group("Соц.сети")
         ]
@@ -177,30 +203,22 @@ async def callback_query(_, qry):
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="settings")])
     elif qry.data.endswith("_tournir"):
         if qry.data.startswith("d"):
-            del chats[str(msg.chat.id)]
             settings.set("Турнир", "Ссылка", "")
             qry.data = "s_tournir"
             return await callback_query(tg, qry)
 
         chats[str(msg.chat.id)] = qry.data
         caption = "Введите ссылку на турнир"
-        markup = [[types.InlineKeyboardButton("<< Отмена", callback_data="s_tournir_cancel")]]
-    elif qry.data == "s_tournir_cancel":
-        del chats[str(msg.chat.id)]
-        qry.data = "s_tournir"
-        return await callback_query(tg, qry)
-    elif qry.data in reply:
-        photo, caption, markup = photos.get(qry.data, photos["menu"]), \
-            captions.get(qry.data, ""), markups.get(qry.data, [])
+        markup = [[types.InlineKeyboardButton("<< Отмена", callback_data="s_tournir")]]
 
     if isinstance(markup, list) and len(markup) > 0:
         markup = types.InlineKeyboardMarkup(markup)
 
-    await edit_photo(
+    await edit_media(
         msg, photo, caption,
         reply_markup=(markup if markup else None)
     )
 
 
 if __name__ == '__main__':
-    tg.run(start())
+    tg.minilib.run(start())
