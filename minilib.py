@@ -28,9 +28,10 @@ class _Item:
 			if inspect.iscoroutinefunction(self.func):
 				result = loop.run_until_complete(result)
 		except BaseException as e:
-			return self.future.set_exception(e)
-		
-		self.future.set_result(result)
+			self.future.set_exception(e)
+			self = None
+		else:
+			self.future.set_result(result)
 
 
 def build(obj: Function, *args, **kwargs):
@@ -66,7 +67,7 @@ def build(obj: Function, *args, **kwargs):
 	return [obj, ar, kw]
 
 
-def _worker(*, queue: Queue = _queue):
+def _worker(queue: Queue = _queue):
 	loop = asyncio.new_event_loop()
 	while True:
 		item = queue.get(block=True)
@@ -78,24 +79,24 @@ def _worker(*, queue: Queue = _queue):
 def init(queue: Queue = _queue):
 	global _queue
 	_queue = queue
-	worker = Thread(target=_worker, args=(queue,))
+	worker = Thread(target=_worker, args=(_queue,), daemon=True)
 	worker.start()
 	atexit.register(worker.join, timeout=1)
 
 
 def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
+	funcs = funcs if isinstance(funcs, Iterable) else [funcs]
 	assert len(funcs) > 0
 	results = []
-	items = list(map(lambda fn: (_Item(Future(), *build(fn, *args, **kwargs))),
-				 (funcs if isinstance(funcs, Iterable) else [funcs])))
+	items = list(map(lambda fn: (_Item(Future(), *build(fn, *args, **kwargs))), funcs))
 
 	for item in items:
 		try:
 			_queue.put(item)
 			result = item.future.result(timeout=5)
-		except BaseException:
+		except BaseException as e:
 			result = item.future
-		results.append(result)
+		results.append((result, item.func))
 
 	return results if len(results) > 1 else results[0]
 

@@ -52,9 +52,10 @@ captions = {
     "tournir": "Примите участие в турнире, оставьте всех противников позади и заполучите долгожданный приз\n\n"
                "P.S. Нажимая на кнопку 'Регистрация' Вы соглашаетесь с нашими правилами",
     "no_tournir": "В данный момент не проводится турнир. Подождите ещё чуть-чуть, мы его скоро анонсируем...",
-    "info": "Найдите и прочитайте интересующую вас информацию. А если не найдёте, то можете задать вопрос ему => <a href='https://t.me/fpgfeedBot'>бот обратной связи</a>",
+    "info": "Найдите и прочитайте интересующую вас информацию. А если не найдёте,"
+            "то можете задать вопрос ему => <a href='https://t.me/fpgfeedBot'>бот обратной связи</a>",
     "subscribe": "Для того чтобы участвовать в турнире нужно быть подписаным на:",
-    "discord_send": "Отправь ссылку на пост или пост сюда"
+    "discord_send": "Отправь пост сюда"
 }
 
 photos = {
@@ -68,47 +69,44 @@ photos = {
 }
 
 markups = {
-    "menu": types.InlineKeyboardMarkup([
+    "menu": [
         [types.InlineKeyboardButton("Регистрация на турнир", callback_data="tournir")],
         [types.InlineKeyboardButton("💸Привилегии💸", callback_data="rights"),
          types.InlineKeyboardButton("📋Правила📋", callback_data="rules")],
         [types.InlineKeyboardButton("ℹИнформацияℹ", callback_data="info"),
          types.InlineKeyboardButton("Задать вопросик⁉️", url="https://t.me/fpgfeedBot")],
         [types.InlineKeyboardButton("Поддержать нас", callback_data="help_us")]
-    ]),
-    "help_us": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("Скины", url="https://steamcommunity.com/tradeoffer/new/?partner=310787303&token=8dNiyxlC")],
-        [types.InlineKeyboardButton("<< Главное меню", callback_data="menu")]
-    ]),
-    "rules": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("Правила турнира", url="https://telegra.ph/Pravila-turnira-01-03")],
-        [types.InlineKeyboardButton("Правила группы", url="https://telegra.ph/Pravila-gruppy-09-21-4")],
-        [types.InlineKeyboardButton("<< Главное меню", callback_data="menu")]
-    ]),
-    "rights": types.InlineKeyboardMarkup([
+    ],
+    "help_us": [
+        [types.InlineKeyboardButton("Скины", url=settings.get("Реквизиты", "Скины"))]
+    ],
+    "rules": [
+        [types.InlineKeyboardButton("📋Правила турнира📋", url=settings.get("Правила", "Турнира"))],
+        [types.InlineKeyboardButton("📋Правила группы📋", url=settings.get("Правила", "Группы"))]
+    ],
+    "rights": [
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
-    ]),
-    "rights_moder": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("Отправить пост в Дискорд", callback_data="discord_send")],
-        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
-    ]),
-    "info": types.InlineKeyboardMarkup([
+    ],
+    "rights_moder": [
+        [types.InlineKeyboardButton("Отправить пост в Дискорд", callback_data="discord_send")]
+    ],
+    "info": [
         [types.InlineKeyboardButton("Мы в соц. сетях", callback_data="social")],
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
-    ]),
+    ],
     "subscribe": [
         [types.InlineKeyboardButton("💬Наш чат💬", url=settings.get("Соц.сети", "📨Чат"))],
         [types.InlineKeyboardButton("Телеграм канал", url="https://t.me/fpg_tournament")]
     ],
-    "settings": types.InlineKeyboardMarkup([
+    "settings": [
         [types.InlineKeyboardButton("Турнир", callback_data="s_tournir")]
-    ]),
-    "discord_send": types.InlineKeyboardMarkup([
+    ],
+    "discord_send": [
         [types.InlineKeyboardButton("<< Назад", callback_data="rights")]
-    ]),
+    ],
     "discord_send_post": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("❌Удалить❌", callback_data="discord_discard")],
-        [types.InlineKeyboardButton("Отправить✅", callback_data="discord_approve")]
+        [types.InlineKeyboardButton("❌Отмена❌", callback_data="discord_discard"),
+         types.InlineKeyboardButton("Отправить✅", callback_data="discord_approve")]
     ])
 }
 
@@ -121,9 +119,9 @@ reply = {
 }
 
 
-async def edit_media(msg, media="", caption="", reply_markup=None):
+async def edit_photo(msg, photo="", caption="", reply_markup=None):
     try:
-        return await msg.edit_media(types.InputMedia(media=photo, caption=caption), reply_markup=reply_markup)
+        return await msg.edit_media(types.InputMediaPhoto(media=photo, caption=caption), reply_markup=reply_markup)
     except err.RPCError as e:
         print("Something where occurred:", e)
         return msg

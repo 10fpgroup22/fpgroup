@@ -12,11 +12,21 @@
             },
             "Турнир": {
                 "Ссылка": ""
+            },
+            "Правила": {
+                "Турнира": "https://telegra.ph/Pravila-turnira-01-03",
+                "Группы": "https://telegra.ph/Pravila-gruppy-09-21-4"
+            },
+            "Реквизиты": {
+                "Скины": "https://steamcommunity.com/tradeoffer/new/?partner=310787303&token=8dNiyxlC"
             }
         }
     },
     "chats": {},
     "left": {
-        "-1001732302212": []
+        "-1001732302212": [],
+        "-1001558155556": [
+            "577069081"
+        ]
     }
 }
