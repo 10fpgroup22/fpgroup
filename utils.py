@@ -8,6 +8,7 @@ from os import environ
 from os.path import abspath, dirname, join
 from pyrogram import Client as TGClient, errors as err, types, enums
 from queue import Queue
+from shutil import rmtree
 from typing import Any
 
 
@@ -105,8 +106,8 @@ markups = {
         [types.InlineKeyboardButton("<< Назад", callback_data="rights")]
     ],
     "discord_send_post": types.InlineKeyboardMarkup([
-        [types.InlineKeyboardButton("❌Отмена❌", callback_data="discord_discard"),
-         types.InlineKeyboardButton("Отправить✅", callback_data="discord_approve")]
+        [types.InlineKeyboardButton("❌Нет❌", callback_data="discord_discard"),
+         types.InlineKeyboardButton("✅Да✅", callback_data="discord_approve")]
     ])
 }
 
@@ -144,6 +145,7 @@ async def start():
     await run(block=False)
     asyncio.create_task(ds.start(getenv("DISCORD")))
     await tg.start()
+    rmtree(join(sdir, 'downloads'), ignore_errors=True)
 
     while True:
         await asyncio.sleep(.1)

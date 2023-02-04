@@ -97,35 +97,43 @@ async def settings_menu(_, msg):
     await tg.send_photo(msg.chat.id, **reply["settings"])
 
 
-@tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
+@tg.on_message(filters.chat("test_fpg_channel") & ~filters.me & ~filters.service)
 async def telegram_channel_handler(_, msg):
-    kwargs = {"reply_markup": markups["discord_send_post"]}
+    kwargs = {}
+    text = ''
 
     if bool(msg.text):
-        text = msg.text.markdown
+        text = msg.text
         method = "send_message"
     elif bool(msg.media):
-        text = msg.caption.markdown
+        text = msg.caption
         kwargs[msg.media.value] = getattr(msg, msg.media.value).file_id
         method = f"send_{msg.media.value}"
     elif bool(msg.poll):
         text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
 
     if bool(text):
-        text = '\n' + text
-
-    if bool(msg.media_group_id):
-        method = "copy_media_group"
-        kwargs["from_chat_id"] = msg.chat.id
-        kwargs["message_id"] = msg.id
-        del kwargs[msg.media.value]
+        text = '\n' + getattr(text, "markdown", text)
 
     kwargs["caption" if bool(msg.media) else "text"] = \
         f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
 
-    await getattr(tg, method)(
-        1695355296, **kwargs, parse_mode=enums.ParseMode.MARKDOWN
+    if bool(msg.media_group_id):
+        del kwargs[msg.media.value]
+        ds_msg = await msg.copy(
+            "python_bot_coder", **kwargs, parse_mode=enums.ParseMode.MARKDOWN
+        )
+    else:
+        ds_msg = await getattr(tg, method)(
+            "python_bot_coder", **kwargs, parse_mode=enums.ParseMode.MARKDOWN
+        )
+    del kwargs, text, method
+
+    await ds_msg.reply_text(
+        "Так будет выглядеть сообщение(||кроме последней строчки||) в Дискорд. Хочешь отправить?",
+        reply_markup=markups["discord_send_post"]
     )
+
 
 
 @tg.on_message(filters.text & filters.private, group=1)
@@ -177,21 +185,23 @@ async def callback_query(_, qry):
                 "У тебя нет доступа к этой функции"
             )).delete)
     elif qry.data.startswith("discord"):
+        ds_msg = msg.reply_to_message
         if qry.data.endswith("approve"):
-            news = await ds.fetch_channel(news_id)
-            text = msg.text
+            news = await ds.fetch_channel(1043945356305629317)
+            text = ds_msg.text
             file, files = None, None
 
-            if bool(msg.media_group_id):
+            if bool(ds_msg.media_group_id):
                 files = list(map(lambda m: (File(m.download())),
-                             await msg.get_media_group()))
-                text = msg.caption
+                             await ds_msg.get_media_group()))
+                text = ds_msg.caption
             elif bool(msg.media):
-                file = File(await msg.download())
-                text = msg.caption
+                file = File(await msg.download(in_memory=True))
+                text = ds_msg.caption
 
-            await news.send(text.markdown, file=file, files=files)
+            await news.send(getattr(text, "markdown", text), file=file, files=files)
             del file, files, news
+        await ds_msg.delete()
         return await msg.delete()
     elif qry.data == "rights" and (user.id == 1695355296 or user.username == "python_bot_coder"):
         caption = ""
