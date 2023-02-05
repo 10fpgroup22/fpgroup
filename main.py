@@ -119,14 +119,15 @@ async def telegram_channel_handler(_, msg):
         f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
 
     if bool(msg.media_group_id):
+        kwargs["from_chat_id"] = msg.chat.id
+        kwargs["message_id"] = msg.id
+        kwargs["captions"] = kwargs.pop("caption", "")
+        method = "copy_media_group"
         del kwargs[msg.media.value]
-        ds_msg = await msg.copy(
-            "python_bot_coder", **kwargs, parse_mode=enums.ParseMode.MARKDOWN
-        )
-    else:
-        ds_msg = await getattr(tg, method)(
-            "python_bot_coder", **kwargs, parse_mode=enums.ParseMode.MARKDOWN
-        )
+
+    ds_msg = await getattr(tg, method)(
+        "python_bot_coder", **kwargs
+    )
     del kwargs, text, method
 
     await ds_msg.reply_text(
