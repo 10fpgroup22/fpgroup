@@ -97,7 +97,7 @@ async def settings_menu(_, msg):
     await tg.send_photo(msg.chat.id, **reply["settings"])
 
 
-@tg.on_message(filters.chat("test_fpg_channel") & ~filters.me & ~filters.service)
+@tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
 async def telegram_channel_handler(_, msg):
     kwargs = {}
     method, text = 'send_message', ''
@@ -202,7 +202,7 @@ async def callback_query(_, qry):
                 files = await asyncio.gather(*[m.download() for m in (await ds_msg.get_media_group())])
                 files = list(map(lambda f: (File(f)), files))
                 text = ds_msg.caption
-            elif bool(msg.media):
+            elif bool(ds_msg.media):
                 file = File(await msg.download(in_memory=True))
                 text = ds_msg.caption
 
@@ -210,13 +210,11 @@ async def callback_query(_, qry):
             rmtree(join(sdir, 'downloads'), ignore_errors=True)
             del file, files, news
 
-        await msg.delete()
         if bool(ds_msg.media_group_id):
-            for m in (await ds_msg.get_media_group()):
-                await m.delete()
+            await asyncio.gather(*[m.delete() for m in (await ds_msg.get_media_group())])
         else:
             await ds_msg.delete()
-        return
+        return await msg.delete()
     elif qry.data == "rights" and (user.id == 1695355296 or user.username == "python_bot_coder"):
         caption = ""
         markup = markups["rights_moder"]
