@@ -132,7 +132,7 @@ async def telegram_channel_handler(_, msg):
             f"> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
 
     ds_msg = await getattr(tg, method)(
-        "python_bot_coder", **kwargs
+        1695355296, **kwargs
     )
     del kwargs, text, method
 
