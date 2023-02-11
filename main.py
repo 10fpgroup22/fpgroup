@@ -100,39 +100,45 @@ async def settings_menu(_, msg):
 @tg.on_message(filters.chat("test_fpg_channel") & ~filters.me & ~filters.service)
 async def telegram_channel_handler(_, msg):
     kwargs = {}
-    text = ''
-
-    if bool(msg.text):
-        text = msg.text
-        method = "send_message"
-    elif bool(msg.media):
-        text = msg.caption
-        kwargs[msg.media.value] = getattr(msg, msg.media.value).file_id
-        method = f"send_{msg.media.value}"
-    elif bool(msg.poll):
-        text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
-
-    if bool(text):
-        text = '\n' + getattr(text, "markdown", text)
-
-    kwargs["caption" if bool(msg.media) else "text"] = \
-        f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
+    method, text = 'send_message', ''
 
     if bool(msg.media_group_id):
+        md_group = await msg.get_media_group()
+        md_group.sort(key=lambda k: k.id)
+        if msg.id != md_group[-1].id:
+            del kwargs, text, method, md_group
+            return
+        text = "\n".join(filter(bool, map(lambda m: getattr(m.caption, "markdown", ""), md_group)))
         kwargs["from_chat_id"] = msg.chat.id
         kwargs["message_id"] = msg.id
-        kwargs["captions"] = kwargs.pop("caption", "")
+        kwargs["captions"] = f"||@everyone||\n{text}\n> Больше здесь <{msg.link}>"
         method = "copy_media_group"
-        del kwargs[msg.media.value]
+        del md_group
+    else:
+        if bool(msg.text):
+            text = msg.text
+        elif bool(msg.poll):
+            text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
+        elif bool(msg.media):
+            text = msg.caption
+            kwargs[msg.media.value] = getattr(msg, msg.media.value).file_id
+            method = f"send_{msg.media.value}"
+
+        if bool(text):
+            text = f"\n{getattr(text, 'markdown', text)}"
+
+        kwargs["caption" if bool(msg.media) and not bool(msg.poll) else "text"] = \
+            f"||@everyone||{text}\n" \
+            f"> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
 
     ds_msg = await getattr(tg, method)(
         "python_bot_coder", **kwargs
     )
     del kwargs, text, method
 
-    await ds_msg.reply_text(
+    await (ds_msg if isinstance(ds_msg, types.Message) else ds_msg[0]).reply_text(
         "Так будет выглядеть сообщение(||кроме последней строчки||) в Дискорд. Хочешь отправить?",
-        reply_markup=markups["discord_send_post"]
+        reply_markup=markups["discord_send_post"], quote=True
     )
 
 
@@ -193,17 +199,24 @@ async def callback_query(_, qry):
             file, files = None, None
 
             if bool(ds_msg.media_group_id):
-                files = list(map(lambda m: (File(m.download())),
-                             await ds_msg.get_media_group()))
+                files = await asyncio.gather(*[m.download() for m in (await ds_msg.get_media_group())])
+                files = list(map(lambda f: (File(f)), files))
                 text = ds_msg.caption
             elif bool(msg.media):
                 file = File(await msg.download(in_memory=True))
                 text = ds_msg.caption
 
             await news.send(getattr(text, "markdown", text), file=file, files=files)
+            rmtree(join(sdir, 'downloads'), ignore_errors=True)
             del file, files, news
-        await ds_msg.delete()
-        return await msg.delete()
+
+        await msg.delete()
+        if bool(ds_msg.media_group_id):
+            for m in (await ds_msg.get_media_group()):
+                await m.delete()
+        else:
+            await ds_msg.delete()
+        return
     elif qry.data == "rights" and (user.id == 1695355296 or user.username == "python_bot_coder"):
         caption = ""
         markup = markups["rights_moder"]

@@ -16,7 +16,8 @@ def getenv(env: str, default: Any = None):
     return environ.get(env, default)
 
 
-tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""))
+tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""),
+              max_concurrent_transmissions=4, parse_mode=enums.ParseMode.MARKDOWN)
 ds = DSClient(intents=Intents.all())
 sdir = abspath(dirname(__file__))
 events = Queue()
@@ -145,7 +146,6 @@ async def start():
     await run(block=False)
     asyncio.create_task(ds.start(getenv("DISCORD")))
     await tg.start()
-    rmtree(join(sdir, 'downloads'), ignore_errors=True)
 
     while True:
         await asyncio.sleep(.1)

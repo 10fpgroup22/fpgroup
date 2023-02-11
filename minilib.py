@@ -7,6 +7,7 @@ from concurrent.futures import Future
 from json import loads
 from queue import Queue
 from threading import Thread
+from time import sleep
 from typing import Any, Optional, Union, Iterable, Coroutine, Callable
 
 __all__ = ["Dispatcher", "Loader", "Function", "build", "get_pattern", "run"]
@@ -67,7 +68,7 @@ def build(obj: Function, *args, **kwargs):
 	return [obj, ar, kw]
 
 
-def _worker(queue: Queue = _queue):
+def _worker(queue: Queue = _queue, _id: int = 1):
 	loop = asyncio.new_event_loop()
 	while True:
 		item = queue.get(block=True)
@@ -76,7 +77,7 @@ def _worker(queue: Queue = _queue):
 			del item
 
 
-def init(queue: Queue = _queue):
+def init(queue: Queue = _queue, *, max_workers: int = 8):
 	global _queue
 	_queue = queue
 	worker = Thread(target=_worker, args=(_queue,), daemon=True)
@@ -93,7 +94,7 @@ def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 	for item in items:
 		try:
 			_queue.put(item)
-			result = item.future.result(timeout=5)
+			result = item.future.result(timeout=10)
 		except BaseException as e:
 			result = item.future
 		results.append((result, item.func))
