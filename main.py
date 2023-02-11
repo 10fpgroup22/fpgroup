@@ -194,7 +194,8 @@ async def callback_query(_, qry):
     elif qry.data.startswith("discord"):
         ds_msg = msg.reply_to_message
         if qry.data.endswith("approve"):
-            news = await ds.fetch_channel(1043945356305629317)
+            # 1043945356305629317
+            news = await ds.fetch_channel(news_id)
             text = ds_msg.text
             file, files = None, None
 
