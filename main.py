@@ -203,7 +203,7 @@ async def callback_query(_, qry):
                 files = list(map(lambda f: (File(f)), files))
                 text = ds_msg.caption
             elif bool(ds_msg.media):
-                file = File(await ds_msg.download(in_memory=True))
+                file = File(await ds_msg.download())
                 text = ds_msg.caption
 
             await news.send(getattr(text, "markdown", text), file=file, files=files)
