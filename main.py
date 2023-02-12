@@ -50,7 +50,7 @@ async def all_group(_, msg: types.Message):
         await tg.send_message(
             msg.chat.id,
             "Брат, я тебя призываю\n" +
-            "".join([u.user.mention(choice(emojis))
+            "".join([u.user.mention(getattr(emoji, choice(emojis), '🫥'))
                      async for u in msg.chat.get_members() if str(u.user.id) not in chat and not u.user.is_bot])
         )
 
@@ -92,12 +92,7 @@ async def add_tag_all(_, msg):
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
 
-@tg.on_message(filters.command('settings') & filters.user("python_bot_coder") & filters.private)
-async def settings_menu(_, msg):
-    await tg.send_photo(msg.chat.id, **reply["settings"])
-
-
-@tg.on_message(filters.chat("fpg_tournament") & ~filters.me & ~filters.service)
+@tg.on_message(filters.chat(["fpg_tournament", "test_fpg_channel"]) & ~filters.me & ~filters.service)
 async def telegram_channel_handler(_, msg):
     kwargs = {}
     method, text = 'send_message', ''
@@ -109,9 +104,11 @@ async def telegram_channel_handler(_, msg):
             del kwargs, text, method, md_group
             return
         text = "\n".join(filter(bool, map(lambda m: getattr(m.caption, "markdown", ""), md_group)))
+        if bool(text):
+            text = f"\n{text}"
         kwargs["from_chat_id"] = msg.chat.id
         kwargs["message_id"] = msg.id
-        kwargs["captions"] = f"||@everyone||\n{text}\n> Больше здесь <{msg.link}>"
+        kwargs["captions"] = f"||@everyone||{text}\n> Больше здесь <{msg.link}>"
         method = "copy_media_group"
         del md_group
     else:
@@ -132,7 +129,7 @@ async def telegram_channel_handler(_, msg):
             f"> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь <{msg.link}>"
 
     ds_msg = await getattr(tg, method)(
-        1695355296, **kwargs
+        ("python_bot_coder" if msg.chat.username == "test_fpg_channel" else 1695355296), **kwargs
     )
     del kwargs, text, method
 
@@ -142,18 +139,9 @@ async def telegram_channel_handler(_, msg):
     )
 
 
-
-@tg.on_message(filters.text & filters.private, group=1)
-async def private_handler(_, msg):
-    if chats.get(str(msg.chat.id), "") == "discord_send":
-        del chats[str(msg.chat.id)]
-        if msg.text.startswith(("t.me/fpg_tournament/", "https://t.me/fpg_tournament/")):
-            chat, msg_id = msg.text.rsplit('/', 2)[1:]
-            await telegram_channel_handler(tg, await tg.get_messages(chat, msg_id))
-
-
 @tg.on_callback_query()
 async def callback_query(_, qry):
+    rmtree(join(sdir, 'downloads'), ignore_errors=True)
     photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
     msg, user = qry.message, qry.from_user
 
@@ -183,19 +171,11 @@ async def callback_query(_, qry):
             markup = list(filter(bool, map(lambda x: (None if x[1] else markups["subscribe"][x[0]]), enumerate(verified))))
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
-    elif qry.data == "discord_send":
-        if user.id == 1695355296:
-            chats[str(msg.chat.id)] = qry.data
-        else:
-            return minilib.run(run_func, (await tg.send_message(
-                user.id,
-                "У тебя нет доступа к этой функции"
-            )).delete)
     elif qry.data.startswith("discord"):
         ds_msg = msg.reply_to_message
+        news = 1043945356305629317 if user.username == "python_bot_coder" else news_id
         if qry.data.endswith("approve"):
-            # 1043945356305629317
-            news = await ds.fetch_channel(news_id)
+            news = await ds.fetch_channel(news)
             text = ds_msg.text
             file, files = None, None
 
@@ -208,7 +188,6 @@ async def callback_query(_, qry):
                 text = ds_msg.caption
 
             await news.send(getattr(text, "markdown", text), file=file, files=files)
-            rmtree(join(sdir, 'downloads'), ignore_errors=True)
             del file, files, news
 
         if bool(ds_msg.media_group_id):
@@ -216,10 +195,6 @@ async def callback_query(_, qry):
         else:
             await ds_msg.delete()
         return await msg.delete()
-    elif qry.data == "rights" and (user.id == 1695355296 or user.username == "python_bot_coder"):
-        caption = ""
-        markup = markups["rights_moder"]
-        markup.extend(markups["rights"])
     elif qry.data == "social":
         markup = [
             [types.InlineKeyboardButton(txt, url=url)]
@@ -227,30 +202,6 @@ async def callback_query(_, qry):
         ]
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="info")])
-    elif qry.data == 's_tournir':
-        url = settings.get("Турнир", "Ссылка")
-        photo, caption = photos["settings"], f"На данный момент ссылка на турнир: {url if url else 'отсутствует'}"
-        
-        if url:
-            markup = [
-                [types.InlineKeyboardButton("🖊Изменить", callback_data="e_tournir")],
-                [types.InlineKeyboardButton("❌Удалить❌", callback_data="d_tournir")]
-            ]
-        else:
-            markup = [
-                [types.InlineKeyboardButton("➕Добавить", callback_data="a_tournir")]
-            ]
-
-        markup.append([types.InlineKeyboardButton("<< Назад", callback_data="settings")])
-    elif qry.data.endswith("_tournir"):
-        if qry.data.startswith("d"):
-            settings.set("Турнир", "Ссылка", "")
-            qry.data = "s_tournir"
-            return await callback_query(tg, qry)
-
-        chats[str(msg.chat.id)] = qry.data
-        caption = "Введите ссылку на турнир"
-        markup = [[types.InlineKeyboardButton("<< Отмена", callback_data="s_tournir")]]
 
     if isinstance(markup, list) and len(markup) > 0:
         markup = types.InlineKeyboardMarkup(markup)

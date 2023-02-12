@@ -4,16 +4,12 @@ import inspect
 from deps import Settings
 from discord import Client as DSClient, Intents, File
 from json import dump, load, JSONDecodeError
-from os import environ
+from os import getenv
 from os.path import abspath, dirname, join
-from pyrogram import Client as TGClient, errors as err, types, enums
+from pyrogram import Client as TGClient, errors as err, types, enums, emoji
 from queue import Queue
 from shutil import rmtree
 from typing import Any
-
-
-def getenv(env: str, default: Any = None):
-    return environ.get(env, default)
 
 
 tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""),
@@ -43,19 +39,17 @@ with tg:
     admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
     print(f"@{me.username} started")
 
-emojis = ["👊🏽", "🐾", "😎", "🧑🏻‍🦳", "🏃🏼", "🤑", "🖋", "🚣🏼‍♀", "🦶🏾", "👨🏻‍🏫", "🧝🏾‍♂️", "🪶", "💓", "👋🏼",
-          "🤹🏻", "🛠", "💁🏻‍♀️", "🚏", "🧑🏿‍🦼", "🧝🏼‍♀️", "🧘🏿‍♂", "👩🏿‍🚀", "🏓", "📪", "🧙🏽‍♂️", "✈️", "☝️", "😮",
-          "🍓", "🤽🏾", "🦸🏻", "🧍‍♂️", "👨🏿‍🎨", "👩‍💼", "🫅🏽", "👩🏽‍🦽", "🤡", "🚢", "☁️"]
+emojis = dir(emoji)
 
 captions = {
     "help_us": "Выберите то, чем хотите помочь",
     "rules": "Что хотите прочитать? Выбирайте из списка ниже",
     "rights": "На данный момент это функция не работает. Просим прощения за временные неудобства",
     "tournir": "Примите участие в турнире, оставьте всех противников позади и заполучите долгожданный приз\n\n"
-               "P.S. Нажимая на кнопку 'Регистрация' Вы соглашаетесь с нашими правилами",
+               "P.S. Нажимая на кнопку 'Регистрация' Вы соглашаетесь правилами нашей организации",
     "no_tournir": "В данный момент не проводится турнир. Подождите ещё чуть-чуть, мы его скоро анонсируем...",
     "info": "Найдите и прочитайте интересующую вас информацию. А если не найдёте,"
-            "то можете задать вопрос ему => <a href='https://t.me/fpgfeedBot'>бот обратной связи</a>",
+            "то можете задать вопрос ему => [бот обратной связи](https://t.me/fpgfeedBot)",
     "subscribe": "Для того чтобы участвовать в турнире нужно быть подписаным на:",
     "discord_send": "Отправь пост сюда"
 }
@@ -66,19 +60,19 @@ photos = {
     "rights": join(sdir, '_rights.png'),
     "tournir": join(sdir, '_tournir.png'),
     "social": join(sdir, '_social.jpg'),
-    "settings": join(sdir, '_settings.png'),
+    # "settings": join(sdir, '_settings.png'),
     "info": join(sdir, '_info.png')
 }
 
 markups = {
-    "menu": [
+    "menu": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("Регистрация на турнир", callback_data="tournir")],
         [types.InlineKeyboardButton("💸Привилегии💸", callback_data="rights"),
          types.InlineKeyboardButton("📋Правила📋", callback_data="rules")],
         [types.InlineKeyboardButton("ℹИнформацияℹ", callback_data="info"),
          types.InlineKeyboardButton("Задать вопросик⁉️", url="https://t.me/fpgfeedBot")],
         [types.InlineKeyboardButton("Поддержать нас", callback_data="help_us")]
-    ],
+    ]),
     "help_us": [
         [types.InlineKeyboardButton("Скины", url=settings.get("Реквизиты", "Скины"))]
     ],
@@ -89,9 +83,6 @@ markups = {
     "rights": [
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ],
-    "rights_moder": [
-        [types.InlineKeyboardButton("Отправить пост в Дискорд", callback_data="discord_send")]
-    ],
     "info": [
         [types.InlineKeyboardButton("Мы в соц. сетях", callback_data="social")],
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
@@ -99,12 +90,6 @@ markups = {
     "subscribe": [
         [types.InlineKeyboardButton("💬Наш чат💬", url=settings.get("Соц.сети", "📨Чат"))],
         [types.InlineKeyboardButton("Телеграм канал", url="https://t.me/fpg_tournament")]
-    ],
-    "settings": [
-        [types.InlineKeyboardButton("Турнир", callback_data="s_tournir")]
-    ],
-    "discord_send": [
-        [types.InlineKeyboardButton("<< Назад", callback_data="rights")]
     ],
     "discord_send_post": types.InlineKeyboardMarkup([
         [types.InlineKeyboardButton("❌Нет❌", callback_data="discord_discard"),
@@ -142,8 +127,6 @@ async def run_func(*funcs, timeout=30):
 
 
 async def start():
-    from bot_web import run
-    await run(block=False)
     asyncio.create_task(ds.start(getenv("DISCORD")))
     await tg.start()
 
