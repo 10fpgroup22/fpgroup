@@ -13,7 +13,7 @@ from typing import Any
 
 
 tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""),
-              max_concurrent_transmissions=4, parse_mode=enums.ParseMode.MARKDOWN)
+              max_concurrent_transmissions=4)
 ds = DSClient(intents=Intents.all())
 sdir = abspath(dirname(__file__))
 events = Queue()
