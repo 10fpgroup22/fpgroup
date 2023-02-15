@@ -1,18 +1,27 @@
 import asyncio
 import atexit
 import inspect
+import logging
 import re
 
 from concurrent.futures import Future
 from json import loads
 from queue import Queue
 from threading import Thread
-from time import sleep
 from typing import Any, Optional, Union, Iterable, Coroutine, Callable
 
 __all__ = ["Dispatcher", "Loader", "Function", "build", "get_pattern", "run"]
 
 Function = Union[Callable, Coroutine]
+
+logger = logging.Logger('minilib.logger')
+c = logging.StreamHandler()
+c.setFormatter(logging.Formatter(
+	fmt="[%(asctime)s %(filename)s:%(lineno)s %(levelname)s] %(message)s",
+	datefmt="%H:%M:%S %d.%m.%y"
+))
+logger.addHandler(c)
+
 _queue = Queue()
 
 
@@ -22,6 +31,12 @@ class _Item:
 		self.func = func
 		self.args = args
 		self.kwargs = kwargs
+
+	def result(self, timeout: int = 10):
+		try:
+			return self.future.result(timeout=timeout)
+		except TimeoutError as e:
+			return self.future
 
 	def run(self, loop: asyncio.AbstractEventLoop):
 		try:
@@ -68,10 +83,10 @@ def build(obj: Function, *args, **kwargs):
 	return [obj, ar, kw]
 
 
-def _worker(queue: Queue = _queue, _id: int = 1):
+def _worker(queue: Queue = _queue):
 	loop = asyncio.new_event_loop()
 	while True:
-		item = queue.get(block=True)
+		item = queue.get()
 		if item is not None:
 			item.run(loop)
 			del item
@@ -80,9 +95,10 @@ def _worker(queue: Queue = _queue, _id: int = 1):
 def init(queue: Queue = _queue, *, max_workers: int = 8):
 	global _queue
 	_queue = queue
-	worker = Thread(target=_worker, args=(_queue,), daemon=True)
-	worker.start()
-	atexit.register(worker.join, timeout=1)
+	for x in range(max_workers):
+		worker = Thread(target=_worker, args=(_queue,), daemon=True)
+		worker.start()
+		atexit.register(worker.join, timeout=0)
 
 
 def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
@@ -92,11 +108,8 @@ def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 	items = list(map(lambda fn: (_Item(Future(), *build(fn, *args, **kwargs))), funcs))
 
 	for item in items:
-		try:
-			_queue.put(item)
-			result = item.future.result(timeout=10)
-		except BaseException as e:
-			result = item.future
+		_queue.put(item)
+		result = item.result()
 		results.append((result, item.func))
 
 	return results if len(results) > 1 else results[0]

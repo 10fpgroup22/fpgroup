@@ -1,8 +1,3 @@
-import minilib
-
-minilib.init()
-
-from pyrogram import enums, filters, types, errors as err
 from random import choice
 from utils import *
 
@@ -109,7 +104,7 @@ async def edited_channel_handler(_, msg):
             elif bool(msg.poll):
                 text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
             elif bool(msg.media):
-                file = File(await ds_msg.download())
+                file = File(await msg.download())
                 text = msg.caption
 
             if bool(text):
@@ -120,12 +115,11 @@ async def edited_channel_handler(_, msg):
             edited = True
             break
 
-    del file, files, news, text
-
     if not edited:
         await channel_handler(tg, msg)
 
-    del edited
+    rmtree(join(sdir, 'downloads'), ignore_errors=True)
+    del edited, file, files, news, text
 
 
 @tg.on_message(filters.chat(["fpg_tournament", "test_fpg_channel"]) & ~filters.me & ~filters.service)

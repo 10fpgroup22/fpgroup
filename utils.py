@@ -1,22 +1,21 @@
 import asyncio
 import inspect
+import minilib
+minilib.init()
 
 from deps import Settings
 from discord import Client as DSClient, Intents, File
 from json import dump, load, JSONDecodeError
 from os import getenv
 from os.path import abspath, dirname, join
-from pyrogram import Client as TGClient, errors as err, types, enums, emoji
-from queue import Queue
+from pyrogram import Client as TGClient, errors as err, types, enums, emoji, filters
 from shutil import rmtree
-from typing import Any
 
 
 tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""),
               max_concurrent_transmissions=4)
 ds = DSClient(intents=Intents.all())
 sdir = abspath(dirname(__file__))
-events = Queue()
 group_id = -1001558155556
 news_id = 1038752367123898459
 
@@ -24,14 +23,14 @@ try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
         chats = dt.get('chats', {})
-        settings = Settings.load(dt.get("settings", {"_": "Settings"}))
         left = dt.get('left', {})
+        settings = Settings(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
     with open(join(sdir, f'{tg.name}.json'), 'w', encoding='utf-8') as fl:
         settings = Settings()
         chats = {}
         left = {}
-        dump({"settings": settings, "chats": chats, "left": left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+        dump({"chats": chats, "left": left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
 with tg:
     global admins
@@ -127,12 +126,16 @@ async def run_func(*funcs, timeout=30):
 
 
 async def start():
-    asyncio.create_task(ds.start(getenv("DISCORD")))
+    from server import run
+    app = await run()
+    app['discord'], app['telegram'] = ds, tg
+    minilib.run(ds.start, getenv("DISCORD"))
     await tg.start()
 
     while True:
         await asyncio.sleep(.1)
         with open(join(sdir, f"{tg.name}.json"), 'w', encoding="utf-8") as file:
-            dump({"settings": settings, "chats": chats, "left": left}, file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+            dump({"settings": settings, "chats": chats, "left": left},
+                 file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
     await tg.stop()
