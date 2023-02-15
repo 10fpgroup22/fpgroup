@@ -26,7 +26,7 @@ async def run():
 	site = web.TCPSite(runner, 'localhost', getenv("PORT", 8080))
 	await site.start()
 
-	ngrok = Popen(["ngrok", "http", site.name], stdout=PIPE)
+	ngrok = Popen(["ngrok", "http", site.name, "--log=stdout"], stdout=PIPE)
 	atexit.register(ngrok.kill)
 	await asyncio.sleep(3)
 
