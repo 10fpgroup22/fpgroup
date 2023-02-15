@@ -5,8 +5,9 @@ import aiohttp_jinja2 as aiojinja
 from aiohttp import web, hdrs
 from jinja2 import FileSystemLoader, pass_context
 from minilib import Loader
-from os.path import realpath, dirname, join
 from typing import Any, Optional, Union, Type
+
+APP_KEY = "aiojinja2"
 
 if not hasattr(asyncio, 'coroutine'):
 	def coroutine(func):
@@ -23,8 +24,6 @@ if not hasattr(asyncio, 'coroutine'):
 
 	asyncio.coroutine = coroutine
 
-APP_KEY = "aiojinja2"
-
 
 def template(template: str, *, app_key: str = APP_KEY, encoding: str = "utf-8", status: int = 200):
 	return aiojinja.template(template, app_key=app_key, encoding=encoding, status=status)
@@ -33,9 +32,11 @@ def template(template: str, *, app_key: str = APP_KEY, encoding: str = "utf-8", 
 @pass_context
 def url_for(context, route: str, query_: Optional[dict[str, str]] = None, **kwargs: Union[str, int]):
 	app: web.Application = context["app"]
-	routes = dict(filter(bool, map(lambda x: ((x.name or x.handler.__name__, x.url_for)
-											  if x.method in hdrs.METH_ALL else None),
-								   app.router.routes())))
+	routes = dict(filter(bool, map(
+		lambda x: (
+			(x.name or x.handler.__name__, x.url_for) if x.method in hdrs.METH_ALL else None
+		), app.router.routes()
+	)))
 	parts: dict[str, str] = {}
 	for key, val in kwargs.items():
 		if isinstance(val, (str, int)):
@@ -58,7 +59,8 @@ def setup(app: web.Application, *, app_key: str = APP_KEY, static: str = "static
 	templates = FileSystemLoader([templates] if isinstance(templates, str) else templates) if templates else None
 	app.router.add_static("/static", static, name='static')
 
-	env = aiojinja.setup(app, app_key=app_key, loader=templates, context_processors=[processor], default_helpers=False)
+	env = aiojinja.setup(app, app_key=app_key, loader=templates,
+						 context_processors=[processor], default_helpers=False)
 	env.globals["url_for"] = url_for
 
 	return env
