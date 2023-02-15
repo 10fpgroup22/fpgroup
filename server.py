@@ -31,12 +31,15 @@ async def run():
 	await asyncio.sleep(1)
 
 	async with ClientSession() as s:
-		async with s.get(f"http://localhost:4040/api/tunnels") as r:
-			resp = list(map(
-				lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
-				(await r.json()).get('tunnels', [])
-			))
-			del resp
+		try:
+			async with s.get(f"http://127.0.0.1:4040/api/tunnels") as r:
+				resp = list(map(
+					lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
+					(await r.json()).get('tunnels', [])
+				))
+				del resp
+		except:
+			pass
 
 	return app
 
