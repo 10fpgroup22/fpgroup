@@ -48,4 +48,4 @@ async def run(block: bool = False):
 	return app
 
 if __name__ == '__main__':
-	pass
+	asyncio.run(run(block=True))
