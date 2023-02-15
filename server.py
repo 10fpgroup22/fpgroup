@@ -19,7 +19,7 @@ async def index(request):
 	return
 
 
-async def run():
+async def run(block: bool = False):
 	app.add_routes(routes)
 	runner = web.AppRunner(app)
 	await runner.setup()
@@ -41,7 +41,11 @@ async def run():
 		except:
 			pass
 
+	if block:
+		while True:
+			await asyncio.sleep(.1)
+
 	return app
 
 if __name__ == '__main__':
-	asyncio.run(run())
+	pass
