@@ -28,7 +28,7 @@ async def run():
 
 	ngrok = Popen(["ngrok", "http", site.name], stdout=PIPE)
 	atexit.register(ngrok.kill)
-	await asyncio.sleep(1)
+	await asyncio.sleep(3)
 
 	async with ClientSession() as s:
 		try:
