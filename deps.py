@@ -29,6 +29,10 @@ def template(template: str, *, app_key: str = APP_KEY, encoding: str = "utf-8", 
 	return aiojinja.template(template, app_key=app_key, encoding=encoding, status=status)
 
 
+async def request_handler():
+	pass
+
+
 @pass_context
 def url_for(context, route: str, query_: Optional[dict[str, str]] = None, **kwargs: Union[str, int]):
 	app: web.Application = context["app"]
@@ -95,7 +99,7 @@ class Settings(Loader):
 		group, name = item if isinstance(item, tuple) else [item, None]
 
 		if not (type(group) == str and type(name) in [str, type(None)]):
-			raise TypeError(f"Failed to delete '{name}' of '{group}'. Check for type 'item' attribute")
+			raise TypeError(f"Failed to get '{name}' of '{group}'. Check for type 'item' attribute")
 
 		if name:
 			return self._groups.get(group, {}).get(name, None)

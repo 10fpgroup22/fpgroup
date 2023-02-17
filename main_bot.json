@@ -2,17 +2,21 @@
     "settings": {
         "_": "Settings",
         "groups": {
+            "Соц.сети":{
+                "📨Чат": "https://t.me/fpg_chat",
+                "💡Instagram": "https://instagram.com/fpg.tournament",
+                "🖍 TikTok": "https://www.tiktok.com/@fpg_tournament",
+                "📌 Steam Group": "http://steamcommunity.com/groups/firstplaygame",
+                "🟢Принять участие в турнире": "https://t.me/FPGFeedbackBot",
+                "♻Бот обратной связи": "https://t.me/fpgfeedBot",
+                "🔵Discord🟡": "https://discord.gg/auKd4xGUb4"
+            },
             "Правила": {
                 "Турнира": "https://telegra.ph/Pravila-turnira-09-21",
                 "Группы": "https://telegra.ph/Pravila-povedeniya-v-chate-12-30"
             },
-            "Соц.сети": {
-                "📨Чат": "https://t.me/fpg_chat",
-                "💡Instagram": "https://instagram.com/fpg.tournament",
-                "🖍TikTok": "https://www.tiktok.com/@fpg_tournament",
-                "📌Steam Group": "http://steamcommunity.com/groups/firstplaygame",
-                "♻Обратной связи": "https://t.me/fpgfeedBot",
-                "🔵Discord🟡": "https://discord.gg/auKd4xGUb4"
+            "Турнир": {
+                "Ссылка": ""
             }
         }
     },

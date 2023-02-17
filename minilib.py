@@ -280,7 +280,7 @@ class Loader:
 	def load(cls, data: Union[str, dict, Any]):
 		if isinstance(data, dict) and data.get("_", None) in Loader.__loaders__:
 			obj = Loader.__loaders__.get(data["_"], cls)
-			obj = run(obj, kwargs={k: data.get(k, data.get(x[x.index(k) - 1], None)) for x in obj.__fields__.items() for k in x})[0]
+			obj = run(obj, **{k: data.get(k, data.get(x[x.index(k) - 1], None)) for x in obj.__fields__.items() for k in x})[0]
 
 			for a, k in obj.__fields__.items():
 				if hasattr(obj, k):

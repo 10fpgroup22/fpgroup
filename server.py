@@ -19,7 +19,7 @@ async def index(request):
 	return
 
 
-async def run(block: bool = False):
+async def run(block: bool = False, *, log_enabled: bool = False):
 	app.add_routes(routes)
 	runner = web.AppRunner(app)
 	await runner.setup()
@@ -33,12 +33,26 @@ async def run(block: bool = False):
 	await asyncio.sleep(3)
 
 	async with ClientSession() as s:
-		async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
-			resp = list(map(
-				lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
-				(await r.json()).get('tunnels', [])
-			))
-			del resp
+		resp = []
+		while True:
+			try:
+				async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
+					resp = list(map(
+						lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
+						(await r.json()).get('tunnels', [])
+					))
+
+				assert len(resp) > 0
+			except TimeoutError as e:
+				if log_enabled:
+					logger.warn(f"<{e}>")
+			except AssertionError as e:
+				continue
+
+			if len(resp) > 0:
+				break
+
+		del resp
 
 	if block:
 		while True:
