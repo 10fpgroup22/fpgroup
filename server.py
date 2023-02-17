@@ -34,23 +34,19 @@ async def run(block: bool = False, *, log_enabled: bool = False):
 
 	async with ClientSession() as s:
 		resp = []
-		while True:
-			try:
-				async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
-					resp = list(map(
-						lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
-						(await r.json()).get('tunnels', [])
-					))
+		try:
+			async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
+				resp = list(map(
+					lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
+					(await r.json()).get('tunnels', [])
+				))
 
-				assert len(resp) > 0
-			except TimeoutError as e:
-				if log_enabled:
-					logger.warn(f"<{e}>")
-			except AssertionError as e:
-				continue
-
-			if len(resp) > 0:
-				break
+			assert len(resp) > 0
+		except TimeoutError as e:
+			if log_enabled:
+				logger.warn(f"<{e}>")
+		except AssertionError as e:
+			continue
 
 		del resp
 
