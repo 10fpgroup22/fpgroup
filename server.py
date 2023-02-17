@@ -19,22 +19,21 @@ async def index(request):
 	return
 
 
-async def shutdown(_):
-	app['ngrok'].kill()
-
-
 async def run(block: bool = False):
 	app.add_routes(routes)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, 'localhost', getenv("PORT", 8080))
 	await site.start()
+	site_path = site.name
 
-	app['ngrok'] = Popen(["ngrok", "http", site.name, "--log=stdout"], stdout=PIPE)
+	app['ngrok'] = Popen([
+		"ngrok", "http", site_path.replace(f"{('https' if site_path.startswith('https://') else 'http')}://", ''), "--log=stdout"],
+	stdout=PIPE)
 	await asyncio.sleep(3)
 
 	async with ClientSession() as s:
-		async with s.get(f"http://127.0.0.1:4040/api/tunnels") as r:
+		async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
 			resp = list(map(
 				lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
 				(await r.json()).get('tunnels', [])
