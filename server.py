@@ -19,6 +19,10 @@ async def index(request):
 	return
 
 
+async def shutdown(_):
+	app['ngrok'].kill()
+
+
 async def run(block: bool = False):
 	app.add_routes(routes)
 	runner = web.AppRunner(app)
@@ -26,20 +30,16 @@ async def run(block: bool = False):
 	site = web.TCPSite(runner, 'localhost', getenv("PORT", 8080))
 	await site.start()
 
-	ngrok = Popen(["ngrok", "http", site.name, "--log=stdout"], stdout=PIPE)
-	atexit.register(ngrok.kill)
+	app['ngrok'] = Popen(["ngrok", "http", site.name, "--log=stdout"], stdout=PIPE)
 	await asyncio.sleep(3)
 
 	async with ClientSession() as s:
-		try:
-			async with s.get(f"http://127.0.0.1:4040/api/tunnels") as r:
-				resp = list(map(
-					lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
-					(await r.json()).get('tunnels', [])
-				))
-				del resp
-		except:
-			pass
+		async with s.get(f"http://127.0.0.1:4040/api/tunnels") as r:
+			resp = list(map(
+				lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
+				(await r.json()).get('tunnels', [])
+			))
+			del resp
 
 	if block:
 		while True:
