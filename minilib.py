@@ -25,94 +25,105 @@ logger.addHandler(c)
 _queue = Queue()
 
 
-class _Item:
-	def __init__(self, future, func, args, kwargs):
-		self.future = future
-		self.func = func
-		self.args = args
-		self.kwargs = kwargs
+class Runner:
+	class _Item:
+		def __init__(self, future, func, args, kwargs):
+			self.future = future
+			self.func = func
+			self.args = args
+			self.kwargs = kwargs
 
-	def result(self, timeout: int = 10):
-		try:
-			return self.future.result(timeout=timeout)
-		except TimeoutError as e:
-			return self.future
+		def result(self, timeout: int = 10):
+			try:
+				return self.future.result(timeout=timeout)
+			except TimeoutError as e:
+				return self.future
 
-	def run(self, loop: asyncio.AbstractEventLoop):
-		try:
-			result = self.func(*self.args, **self.kwargs)
-			if inspect.iscoroutinefunction(self.func):
-				result = loop.run_until_complete(result)
-		except BaseException as e:
-			self.future.set_exception(e)
-			self = None
-		else:
-			self.future.set_result(result)
+		def run(self, loop: asyncio.AbstractEventLoop):
+			try:
+				result = self.func(*self.args, **self.kwargs)
+				if inspect.iscoroutinefunction(self.func):
+					result = loop.run_until_complete(result)
+			except BaseException as e:
+				self.future.set_exception(e)
+				self = None
+			else:
+				self.future.set_result(result)
 
+	def __init__(self, queue: Queue = _queue, *, max_workers: int = 8):
+		self._queue = queue
+		self._max_workers = max_workers
+		self._workers = [Thread(target=self._worker, daemon=True) for _ in range(max(max_workers, 1))]
+		for worker in self._workers:
+			worker.start()
+		atexit.register(self.__exit__)
 
-def build(obj: Function, *args, **kwargs):
-	spec = inspect.getfullargspec(obj)
-	func = int(inspect.ismethod(obj) or inspect.isclass(obj))
-	kw, _args, _kwargs, _default = spec.kwonlydefaults or {}, spec.args or [], \
-								   spec.kwonlyargs or [], spec.defaults or []
+	@staticmethod
+	def build(obj: Function, *args, **kwargs):
+		spec = inspect.getfullargspec(obj)
+		func = int(inspect.ismethod(obj) or inspect.isclass(obj))
+		kw, _args, _kwargs, _default = spec.kwonlydefaults or {}, spec.args or [], \
+									   spec.kwonlyargs or [], spec.defaults or []
 
-	ar = [
-		kwargs.get(k, v) or d
-		for k, v, d in zip(
-			_args[func:],
-			list(args) + [None] * (len(_args) - len(args)),
-			[None] * (len(_args) - len(_default) - func) + list(_default)
-		)
-	]
-	if spec.varargs:
-		ar += list(args[len(_args) - func:])
+		ar = [
+			kwargs.get(k, v) or d
+			for k, v, d in zip(
+				_args[func:],
+				list(args) + [None] * (len(_args) - len(args)),
+				[None] * (len(_args) - len(_default) - func) + list(_default)
+			)
+		]
+		if spec.varargs:
+			ar += list(args[len(_args) - func:])
 
-	kw.update({
-		k: kwargs.get(k, kw.get(k, None))
-		for k in _kwargs
-	})
-	if spec.varkw:
 		kw.update({
 			k: kwargs.get(k, kw.get(k, None))
-			for k in kwargs.keys()
-			if k not in _args
+			for k in _kwargs
 		})
+		if spec.varkw:
+			kw.update({
+				k: kwargs.get(k, kw.get(k, None))
+				for k in kwargs.keys()
+				if k not in _args
+			})
 
-	del spec, func, _args, _kwargs, _default
+		del spec, func, _args, _kwargs, _default
 
-	return [obj, ar, kw]
+		return [obj, ar, kw]
 
+	def _worker(self):
+		loop = asyncio.new_event_loop()
+		while True:
+			item = self._queue.get()
+			if item is not None:
+				item.run(loop)
+				del item
 
-def _worker(queue: Queue = _queue):
-	loop = asyncio.new_event_loop()
-	while True:
-		item = queue.get()
-		if item is not None:
-			item.run(loop)
-			del item
+	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
+		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
+		assert len(funcs) > 0
+		results = []
+		items = list(map(lambda fn: (self._Item(Future(), *self.build(fn, *args, **kwargs))), funcs))
 
+		for item in items:
+			_queue.put(item)
+			result = item.result()
+			results.append((result, item.func))
 
-def init(queue: Queue = _queue, *, max_workers: int = 8):
-	global _queue
-	_queue = queue
-	for x in range(max_workers):
-		worker = Thread(target=_worker, args=(_queue,), daemon=True)
-		worker.start()
-		atexit.register(worker.join, timeout=0)
+		return results if len(results) > 1 else results[0]
 
+	def __enter__(self):
+		return self
 
-def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
-	funcs = funcs if isinstance(funcs, Iterable) else [funcs]
-	assert len(funcs) > 0
-	results = []
-	items = list(map(lambda fn: (_Item(Future(), *build(fn, *args, **kwargs))), funcs))
+	def __exit__(self, *args):
+		for t in self._workers:
+			t.join(timeout=1/len(self._workers))
 
-	for item in items:
-		_queue.put(item)
-		result = item.result()
-		results.append((result, item.func))
+	async def __aenter__(self):
+		return self.__enter__()
 
-	return results if len(results) > 1 else results[0]
+	async def __aexit__(self, *args):
+		self.__exit__(*args)
 
 
 def _repr_(func: Function):
@@ -314,3 +325,8 @@ class Loader:
 		cls.__fields__.update(kwargs.get("fields", {}))
 		Loader.__loaders__ = {o.__name__: o for o in Loader._get_subclasses_(Loader)}
 		super(Loader, cls).__init_subclass__(**kwargs)
+
+
+if __name__ == '__main__':
+	runner = Runner()
+	print(runner.run(print, 1, 3, "274", "fuck", sep="\n\r"))
