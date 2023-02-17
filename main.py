@@ -1,5 +1,9 @@
+import re
+
 from random import choice
 from utils import *
+
+LINK_RE = re.compile(r"(https://)?t.me/(c/)?(?P<username>[0-9]+|[a-z0-9_]+)/(?P<message>[0-9]+)")
 
 
 @tg.on_message(filters.chat(group_id) & filters.service, group=-1)
@@ -85,6 +89,15 @@ async def add_tag_all(_, msg):
         del group
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
+
+
+@tg.on_message(filters.chat("python_bot_coder") & filters.command(["dispatch", f"dispatch@{me.username}"]) & filters.private)
+async def dispatch_message(_, msg):
+    link = LINK_RE.fullmatch(msg.command[-1])
+    if link and username in ["test_fpg_channel", "fpg_tournament"]:
+        await edited_channel_handler(tg, await tg.get_messages(
+            *map(lambda x: (int(x) if x.isalnum() else x), link.group('username', 'message'))
+        ))
 
 
 @tg.on_edited_message(filters.chat(["test_fpg_channel", "fpg_tournament"]) & ~filters.me & ~filters.service)

@@ -51,12 +51,12 @@ class Runner:
 				self.future.set_result(result)
 
 	def __init__(self, queue: Queue = _queue, *, max_workers: int = 8):
+		atexit.register(self.__exit__)
 		self._queue = queue
 		self._max_workers = max_workers
 		self._workers = [Thread(target=self._worker, daemon=True) for _ in range(max(max_workers, 1))]
 		for worker in self._workers:
 			worker.start()
-		atexit.register(self.__exit__)
 
 	@staticmethod
 	def build(obj: Function, *args, **kwargs):
@@ -124,6 +124,22 @@ class Runner:
 
 	async def __aexit__(self, *args):
 		self.__exit__(*args)
+
+
+_global_runner = Runner()
+
+
+def init(queue: Queue = _queue, max_workers: int = 8):
+	global _global_runner
+	_global_runner = Runner(queue, max_workers=max_workers)
+
+
+def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
+	return _global_runner.run(funcs, *args, **kwargs)
+
+
+def build(obj: Function, *args, **kwargs):
+	return Runner.build(obj, *args, **kwargs)
 
 
 def _repr_(func: Function):
