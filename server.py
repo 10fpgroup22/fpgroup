@@ -46,7 +46,7 @@ async def run(block: bool = False, *, log_enabled: bool = False):
 			if log_enabled:
 				logger.warn(f"<{e}>")
 		except AssertionError as e:
-			continue
+			pass
 
 		del resp
 
