@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 import minilib
-minilib.init()
 
 from deps import Settings
 from discord import Client as DSClient, Intents, File
