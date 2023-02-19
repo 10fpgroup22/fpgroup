@@ -166,6 +166,8 @@ async def channel_handler(_, msg):
 
         if bool(text):
             text = f"\n{getattr(text, 'markdown', text)}"
+        else:
+            text = ''
 
         kwargs["caption" if bool(msg.media) and not bool(msg.poll) else "text"] = \
             f"||@everyone||{text}\n" \
@@ -216,8 +218,9 @@ async def callback_query(_, qry):
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
     elif qry.data.startswith("discord"):
         ds_msg = msg.reply_to_message
-        news = 1043945356305629317 if user.username == "python_bot_coder" else news_id
+        await msg.delete()
         if qry.data.endswith("approve"):
+            news = 1043945356305629317 if user.username == "python_bot_coder" else news_id
             news = await ds.fetch_channel(news)
             text = ds_msg.text
             file, files = None, None
@@ -238,7 +241,7 @@ async def callback_query(_, qry):
             await asyncio.gather(*[m.delete() for m in (await ds_msg.get_media_group())])
         else:
             await ds_msg.delete()
-        return await msg.delete()
+        return
     elif qry.data == "social":
         markup = [
             [types.InlineKeyboardButton(txt, url=url)]

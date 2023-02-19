@@ -30,25 +30,6 @@ async def run(block: bool = False, *, log_enabled: bool = False):
 	app['ngrok'] = Popen([
 		"ngrok", "http", site_path.replace(f"{('https' if site_path.startswith('https://') else 'http')}://", ''), "--log=stdout"],
 	stdout=PIPE)
-	await asyncio.sleep(3)
-
-	async with ClientSession() as s:
-		resp = []
-		try:
-			async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
-				resp = list(map(
-					lambda t: logger.info(f"{t['config']['addr']} -> {t['public_url']}"),
-					(await r.json()).get('tunnels', [])
-				))
-
-			assert len(resp) > 0
-		except TimeoutError as e:
-			if log_enabled:
-				logger.warn(f"<{e}>")
-		except AssertionError as e:
-			pass
-
-		del resp
 
 	if block:
 		while True:
