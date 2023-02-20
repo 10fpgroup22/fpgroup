@@ -28,7 +28,7 @@ async def run(block: bool = False, *, log_enabled: bool = False):
 	site_path = site.name
 
 	app['ngrok'] = Popen([
-		"ngrok", "http", site_path.replace(f"{('https' if site_path.startswith('https://') else 'http')}://", ''), "--log=stdout"],
+		"ngrok", "http", site_path.replace(f"{('https' if site_path.startswith('https:') else 'http')}://", ''), "--log=stdout"],
 	stdout=PIPE)
 
 	if block:

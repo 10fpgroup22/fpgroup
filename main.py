@@ -117,14 +117,14 @@ async def edited_channel_handler(_, msg):
             elif bool(msg.poll):
                 text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
             elif bool(msg.media):
-                file = File(await msg.download())
+                files = [File(await msg.download())]
                 text = msg.caption
 
             if bool(text):
                 text = f"\n{getattr(text, 'markdown', text)}"
 
             await dsm.edit(content=f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь {msg.link}",
-                           attachments=file, suppress=True)
+                           attachments=files, suppress=True)
             edited = True
             break
 
