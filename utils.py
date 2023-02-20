@@ -128,7 +128,7 @@ async def start():
     from server import run
     app = await run()
     app['discord'], app['telegram'] = ds, tg
-    asyncio.create_task(ds.start, getenv("DISCORD"))
+    asyncio.create_task(ds.start(getenv("DISCORD")))
     await tg.start()
 
     while True:
