@@ -178,7 +178,7 @@ async def channel_handler(_, msg):
 @tg.on_callback_query()
 async def callback_query(_, qry):
     rmtree(join(sdir, 'downloads'), ignore_errors=True)
-    photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
+    photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, None)
     msg, user = qry.message, qry.from_user
 
     if str(msg.chat.id) in chats:
@@ -241,12 +241,12 @@ async def callback_query(_, qry):
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="info")])
 
-    if isinstance(markup, list) and len(markup) > 0:
+    if bool(markup) and isinstance(markup, list):
         markup = types.InlineKeyboardMarkup(markup)
 
     await edit_photo(
         msg, photo, caption,
-        reply_markup=(markup if markup else None)
+        reply_markup=(markup if bool(markup) else None)
     )
 
 
