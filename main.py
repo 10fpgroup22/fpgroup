@@ -178,7 +178,7 @@ async def channel_handler(_, msg):
 @tg.on_callback_query()
 async def callback_query(_, qry):
     rmtree(join(sdir, 'downloads'), ignore_errors=True)
-    photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, None)
+    photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
     msg, user = qry.message, qry.from_user
 
     if str(msg.chat.id) in chats:
