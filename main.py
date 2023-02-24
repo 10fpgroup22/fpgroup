@@ -91,15 +91,6 @@ async def add_tag_all(_, msg):
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
 
-@tg.on_message(filters.chat("python_bot_coder") & filters.command(["dispatch", f"dispatch@{me.username}"]) & filters.private)
-async def dispatch_message(_, msg):
-    link = LINK_RE.fullmatch(msg.command[-1])
-    if link and username in ["test_fpg_channel", "fpg_tournament"]:
-        await edited_channel_handler(tg, await tg.get_messages(
-            *map(lambda x: (int(x) if x.isalnum() else x), link.group('username', 'message'))
-        ))
-
-
 @tg.on_edited_message(filters.chat(["test_fpg_channel", "fpg_tournament"]) & ~filters.me & ~filters.service)
 async def edited_channel_handler(_, msg):
     news = 1043945356305629317 if msg.chat.username == "test_fpg_channel" else news_id

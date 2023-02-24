@@ -37,7 +37,7 @@ with tg:
     admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
     print(f"@{me.username} started")
 
-emojis = filter(lambda x: not x.startswith('_'), dir(emoji))
+emojis = list(filter(lambda x: not x.startswith('_'), dir(emoji)))
 
 captions = {
     "help_us": "Выберите то, чем хотите помочь",
