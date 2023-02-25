@@ -96,6 +96,10 @@ async def edited_channel_handler(_, msg):
     news = 1043945356305629317 if msg.chat.username == "test_fpg_channel" else news_id
     news = await ds.fetch_channel(news)
     text = msg.text
+    markup = '\n'.join(
+        f"[{y.text}] {y.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
+        for y in x
+    )
     file, files = [], []
     edited = False
 
@@ -114,6 +118,9 @@ async def edited_channel_handler(_, msg):
         text = f"\n{getattr(text, 'markdown', text)}"
     else:
         text = ''
+
+    if bool(markup):
+        text += f"\n{markup}"
 
     async for dsm in news.history(after=msg.date, limit=10):
         if dsm.content.endswith(msg.link):
