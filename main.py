@@ -133,6 +133,10 @@ async def edited_channel_handler(_, msg):
 async def channel_handler(_, msg):
     kwargs = {}
     method, text = 'send_message', ''
+    markup = "\n".join(
+        f"[{y.text}] {y.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
+        for y in x if bool(y.url)
+    )
 
     if bool(msg.media_group_id):
         md_group = await msg.get_media_group()
@@ -162,6 +166,9 @@ async def channel_handler(_, msg):
             text = f"\n{getattr(text, 'markdown', text)}"
         else:
             text = ''
+
+        if bool(markup):
+            text += f"\n{markup}"
 
         kwargs["caption" if bool(msg.media) and not bool(msg.poll) else "text"] = \
             f"||@everyone||{text}\n" \
