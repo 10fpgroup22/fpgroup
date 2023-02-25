@@ -97,8 +97,8 @@ async def edited_channel_handler(_, msg):
     news = await ds.fetch_channel(news)
     text = msg.text
     markup = '\n'.join(
-        f"[{y.text}] {y.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
-        for y in x
+        f"[{y.text}] {y.url or y.login_url.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
+        for y in x if bool(y.url) or bool(getattr(y.login_url, 'url', None))
     )
     file, files = [], []
     edited = False
@@ -141,8 +141,8 @@ async def channel_handler(_, msg):
     kwargs = {}
     method, text = 'send_message', ''
     markup = "\n".join(
-        f"[{y.text}] {y.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
-        for y in x if bool(y.url)
+        f"[{y.text}] {y.url or y.login_url.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
+        for y in x if bool(y.url) or bool(getattr(y.login_url, 'url', None))
     )
 
     if bool(msg.media_group_id):
