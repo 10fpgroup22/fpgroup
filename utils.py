@@ -70,7 +70,7 @@ markups = {
         [types.InlineKeyboardButton("Поддержать нас", callback_data="help_us")]
     ]),
     "help_us": [
-        [types.InlineKeyboardButton("Скины", url=settings.get("Реквизиты", "Скины"))]
+        [types.InlineKeyboardButton("Скины", url=settings.get("Реквизиты", "Скины"))],
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ],
     "rules": [
