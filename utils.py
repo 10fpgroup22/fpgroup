@@ -71,6 +71,7 @@ markups = {
     ]),
     "help_us": [
         [types.InlineKeyboardButton("Скины", url=settings.get("Реквизиты", "Скины"))]
+        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ],
     "rules": [
         [types.InlineKeyboardButton("📋Правила турнира📋", url=settings.get("Правила", "Турнира"))],
