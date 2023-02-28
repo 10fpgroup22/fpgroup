@@ -19,32 +19,15 @@ async def index(request):
 	return
 
 
-@routes.get('/live')
-async def live_stream(request):
-	stream = web.StreamResponse()
-	stream.content_type = 'multipart/x-mixed-replace; boundary=frame'
-	await stream.prepare(request)
-
-	for frame in live:
-		stream.write(frame)
-
-	return stream
-
-
-@routes.post('/live')
-async def stream_live(request):
-	return
-
-
 async def shutdown(_):
 	app['ngrok'].kill()
 
 
 async def get_domain():
-	await asyncio.sleep(3)
 	async with ClientSession() as s:
-		resp = []
 		while True:
+			resp = []
+			await asyncio.sleep(1)
 			try:
 				async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
 					resp = list(map(
@@ -54,10 +37,8 @@ async def get_domain():
 				assert len(resp) > 0
 			except (TimeoutError, AssertionError):
 				continue
-
+			del resp
 			break
-
-		del resp
 
 
 async def run(block: bool = False, *, log_enabled: bool = False):
