@@ -68,7 +68,7 @@ markups = {
         [types.InlineKeyboardButton("💸Привилегии💸", callback_data="rights"),
          types.InlineKeyboardButton("📋Правила📋", callback_data="rules")],
         [types.InlineKeyboardButton("ℹИнформацияℹ", callback_data="info"),
-         types.InlineKeyboardButton("Задать вопросик⁉️", url="https://t.me/fpgfeedBot")],
+         types.InlineKeyboardButton("Задать вопросик⁉️", url="https://t.me/ACL_feed_Bot")],
         [types.InlineKeyboardButton("Поддержать нас", callback_data="help_us")]
     ]),
     "help_us": [
