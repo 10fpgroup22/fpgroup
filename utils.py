@@ -23,13 +23,11 @@ try:
         dt = load(fl)
         chats = dt.get('chats', {})
         left = dt.get('left', {})
-        settings = Settings(dt.get('settings', {'_': 'Settings'}))
+        settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
-    with open(join(sdir, f'{tg.name}.json'), 'w', encoding='utf-8') as fl:
-        settings = Settings()
-        chats = {}
-        left = {}
-        dump({"chats": chats, "left": left}, fl, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+    settings = Settings()
+    chats = {}
+    left = {}
 
 with tg:
     global admins

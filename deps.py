@@ -73,10 +73,8 @@ def setup(app: web.Application, *, app_key: str = APP_KEY, static: str = "static
 class Settings(Loader):
 	__fields__ = {"groups": "_groups"}
 
-	def __init__(self, data: Optional[Union[str, dict, Any]] = None):
+	def __init__(self):
 		self._groups = {}
-		if data is not None:
-			self = Settings.load(data)
 
 	def add(self, group: str):
 		self[group] = {}
