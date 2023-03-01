@@ -91,7 +91,7 @@ async def add_tag_all(_, msg):
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
 
-@tg.on_edited_message(filters.chat(["test_fpg_channel", "fpg_tournament"]) & ~filters.me & ~filters.service)
+@tg.on_edited_message(filters.chat(["acl_esports", "test_fpg_channel"]) & ~filters.me & ~filters.service)
 async def edited_channel_handler(_, msg):
     news = 1043945356305629317 if msg.chat.username == "test_fpg_channel" else news_id
     news = await ds.fetch_channel(news)
@@ -136,7 +136,7 @@ async def edited_channel_handler(_, msg):
     del edited, file, files, news, text
 
 
-@tg.on_message(filters.chat(["fpg_tournament", "test_fpg_channel"]) & ~filters.me & ~filters.service)
+@tg.on_message(filters.chat(["acl_esports", "test_fpg_channel"]) & ~filters.me & ~filters.service)
 async def channel_handler(_, msg):
     kwargs = {}
     method, text = 'send_message', ''
