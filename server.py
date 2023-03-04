@@ -31,12 +31,14 @@ async def get_domain():
 			try:
 				async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
 					resp = list(map(
-						lambda x: logger.info(f"{x['config']['addr']} -> {x['public_url']}"), (await r.json()).get('tunnels', [])
+						lambda x: (x['config']['addr'], x['public_url']), (await r.json()).get('tunnels', [])
 					))
 
 				assert len(resp) > 0
 			except (TimeoutError, AssertionError):
 				continue
+			app['domains'] = resp
+			logger.info(f"Domains: {','.join(' -> '.join(x) for x in resp)}")
 			del resp
 			break
 

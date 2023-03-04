@@ -4,7 +4,7 @@ import inspect
 import logging
 import re
 
-from concurrent.futures import Future
+from concurrent.futures import Future, as_completed
 from json import loads
 from queue import Queue
 from threading import Thread
@@ -22,22 +22,20 @@ c.setFormatter(logging.Formatter(
 ))
 logger.addHandler(c)
 
-_queue = Queue()
-
 
 class Runner:
-	class _Item:
-		def __init__(self, future, func, args, kwargs):
-			self.future = future
+	class _Item(Future):
+		def __init__(self, func, args, kwargs):
+			super().__init__()
 			self.func = func
 			self.args = args
 			self.kwargs = kwargs
 
-		def result(self, timeout: int = 10):
+		def result(self, timeout: float = 5.0):
 			try:
-				return self.future.result(timeout=timeout)
+				return super().result(timeout=timeout)
 			except TimeoutError as e:
-				return self.future
+				return self
 
 		def run(self, loop: asyncio.AbstractEventLoop):
 			try:
@@ -45,18 +43,54 @@ class Runner:
 				if inspect.iscoroutinefunction(self.func):
 					result = loop.run_until_complete(result)
 			except BaseException as e:
-				self.future.set_exception(e)
+				self.set_exception(e)
 				self = None
 			else:
-				self.future.set_result(result)
+				self.set_result(result)
 
-	def __init__(self, queue: Queue = _queue, *, max_workers: int = 8):
+		def __repr__(self):
+			return super().__repr__().replace(self.__class__.__name__, "Future")
+
+	_queue: Queue = Queue()
+	_max_workers: int = 8
+	_workers: set[Thread] = set()
+
+	def __init__(self, queue: Optional[Queue] = None, *, max_workers: int = _max_workers):
+		assert max_workers > 0, "'max_workers' must more than zero"
 		atexit.register(self.__exit__)
-		self._queue = queue
+		self._queue = queue or self._queue
 		self._max_workers = max_workers
-		self._workers = [Thread(target=self._worker, daemon=True) for _ in range(max(max_workers, 1))]
-		for worker in self._workers:
+		self.initialize()
+
+	def initialize(self):
+		if bool(self):
+			return self
+
+		for _ in range(max(self._max_workers, 1)):
+			worker = Thread(target=self._worker, daemon=True)
 			worker.start()
+			self._workers.add(worker)
+
+		return self
+
+	def shutdown(self, wait: bool = True, *, timeout: Optional[float] = None):
+		assert bool(self), "Already shutdowned"
+
+		if wait:
+			for t in self._workers:
+				t.join(timeout=timeout)
+				del t
+
+		self._workers.clear()
+
+	def _worker(self):
+		loop = asyncio.new_event_loop()
+		while True:
+			item = self._queue.get()
+			if item is not None:
+				item.run(loop)
+				del item
+		loop.close()
 
 	@staticmethod
 	def build(obj: Function, *args, **kwargs):
@@ -91,33 +125,30 @@ class Runner:
 
 		return [obj, ar, kw]
 
-	def _worker(self):
-		loop = asyncio.new_event_loop()
-		while True:
-			item = self._queue.get()
-			if item is not None:
-				item.run(loop)
-				del item
-
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
-		assert len(funcs) > 0
+		assert len(funcs) > 0 and len(self._workers) > 0
 		results = []
-		items = list(map(lambda fn: (self._Item(Future(), *self.build(fn, *args, **kwargs))), funcs))
+		items = list(map(lambda fn: self._Item(*self.build(fn, *args, **kwargs)), funcs))
 
 		for item in items:
-			_queue.put(item)
-			result = item.result()
-			results.append((result, item.func))
+			self._queue.put(item)
+
+		for f in as_completed(items, timeout=10):
+			results.append((f.result(), f.func))
 
 		return results if len(results) > 1 else results[0]
 
+	__call__ = run
+
+	def __bool__(self):
+		return len(self._workers) > 0
+
 	def __enter__(self):
-		return self
+		return self.initialize()
 
 	def __exit__(self, *args):
-		for t in self._workers:
-			t.join(timeout=1/len(self._workers))
+		self.shutdown(timeout=1/self._max_workers)
 
 	async def __aenter__(self):
 		return self.__enter__()
@@ -127,19 +158,21 @@ class Runner:
 
 
 _global_runner = Runner()
+build = Runner.build
 
 
-def init(queue: Queue = _queue, max_workers: int = 8):
+def init(queue: Optional[Queue] = None, max_workers: int = 8):
 	global _global_runner
 	_global_runner = Runner(queue, max_workers=max_workers)
+	return _global_runner
 
 
 def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
-	return _global_runner.run(funcs, *args, **kwargs)
+	return _global_runner(funcs, *args, **kwargs)
 
 
-def build(obj: Function, *args, **kwargs):
-	return Runner.build(obj, *args, **kwargs)
+def infinite(func: Function):
+	pass
 
 
 def _repr_(func: Function):
@@ -209,15 +242,6 @@ class Dispatcher:
 
 				return wrapped
 
-		if inspect.iscoroutinefunction(event_or_func):
-			async def _wrapper_(func: Function):
-				return wrapper(func)
-
-			_wrapper_.__name__ = wrapper.__name__
-			_wrapper_.__repr__ = wrapper.__repr__
-
-			return run(_wrapper_, event_or_func)
-
 		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper(event_or_func)
 
 	def dispatch(self, event: str, *args, **kwargs):
@@ -262,16 +286,7 @@ class Dispatcher:
 
 			return wrapped
 
-		if inspect.iscoroutinefunction(event_or_func):
-			async def _wrapper_(func: Function):
-				return wrapper(func)
-
-			_wrapper_.__name__ = wrapper.__name__
-			_wrapper_.__repr__ = wrapper.__repr__
-
-			return run(_wrapper_, event_or_func)
-
-		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper
+		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper(event_or_func)
 
 	def __contains__(self, event: str):
 		return event in self._events
@@ -280,13 +295,13 @@ class Dispatcher:
 		return id(self)
 
 	def __iter__(self):
-		return iter(self.__events.items())
+		return iter(self._events.items())
 
 	def __format__(self, spec: str):
 		if spec in ['e', 'events']:
-			return ' , '.join(self._events.keys())
+			return ' ; '.join(self._events.keys())
 		elif spec in ['p', 'ptr', 'patterns']:
-			return ' , '.join(self._patterns.keys())
+			return ' ; '.join(self._patterns.keys())
 
 		return repr(self)
 
@@ -306,8 +321,8 @@ class Loader:
 	@classmethod
 	def load(cls, data: Union[str, dict, Any]):
 		if isinstance(data, dict) and data.get("_", None) in Loader.__loaders__:
-			obj = Loader.__loaders__.get(data["_"], cls)
-			obj = run(obj, **{k: data.get(k, data.get(x[x.index(k) - 1], None)) for x in obj.__fields__.items() for k in x})[0]
+			obj = Loader.__loaders__.get(data.pop("_"), cls)
+			obj = run(obj, **{k: data.get(k, None) for k in obj.__fields__.keys()})[0]
 
 			for a, k in obj.__fields__.items():
 				if hasattr(obj, k):
@@ -328,10 +343,10 @@ class Loader:
 
 	@property
 	def __dict__(self):
-		return {"_": self.__class__.__name__, **{a: getattr(self, k, None) for a, k in self.__fields__.items() if hasattr(self, k)}}
+		return {"_": self.__class__.__name__, **dict(iter(self))}
 
 	def __iter__(self):
-		return iter([(k, getattr(self, k, None)) for k in self.__fields__.values() if hasattr(self, k)])
+		yield from [(k, getattr(self, k, None)) for k in self.__fields__.values() if hasattr(self, k)]
 
 	@staticmethod
 	def _get_subclasses_(cls):
@@ -344,5 +359,11 @@ class Loader:
 
 
 if __name__ == '__main__':
-	runner = Runner()
-	print(runner.run(print, 1, 3, "274", "fuck", sep="\n\r"))
+	async def test():
+		print("test1")
+
+	async def test_with_args(*args):
+		print(*args)
+
+
+	run([test, test_with_args], 123, "Fuck")

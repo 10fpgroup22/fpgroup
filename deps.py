@@ -4,7 +4,7 @@ import aiohttp_jinja2 as aiojinja
 
 from aiohttp import web, hdrs
 from jinja2 import FileSystemLoader, pass_context
-from minilib import Loader
+from minilib import Loader, logger
 from typing import Any, Optional, Union, Type
 
 APP_KEY = "aiojinja2"
@@ -29,8 +29,11 @@ def template(template: str, *, app_key: str = APP_KEY, encoding: str = "utf-8", 
 	return aiojinja.template(template, app_key=app_key, encoding=encoding, status=status)
 
 
-async def request_handler():
-	pass
+@web.middleware
+async def request_handler(req, handler):
+	resp = await handler(req)
+	logger.info(f"[{req.remote}] {req.method} {req.url} - {resp.status}")
+	return resp
 
 
 @pass_context
