@@ -77,11 +77,11 @@ class Executor:
 			return self
 
 		for _ in range(max(self._max_workers, 1)):
-			worker = Thread(target=self._worker)
+			worker = Thread(target=self._worker, daemon=True)
 			worker.start()
 			self._workers.add(worker)
 
-		worker = Thread(target=self._worker, args=(Executor.INFINITE,))
+		worker = Thread(target=self._worker, args=(Executor.INFINITE,), daemon=True)
 		worker.start()
 		self._workers.add(worker)
 
