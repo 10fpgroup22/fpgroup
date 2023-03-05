@@ -38,7 +38,7 @@ async def get_domain():
 			except (TimeoutError, AssertionError):
 				continue
 			app['domains'] = resp
-			logger.info(f"Domains: {','.join(' -> '.join(x) for x in resp)}")
+			logger.info(f"Domains: {' , '.join(' -> '.join(x) for x in resp)}")
 			del resp
 			break
 

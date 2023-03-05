@@ -69,8 +69,8 @@ class Executor:
 		assert max_workers > 0, "'max_workers' must more than zero"
 		self._queue = queue or self._queue
 		self._max_workers = max_workers
-		atexit.register(self.shutdown, timeout=1/self._max_workers)
 		self.initialize()
+		atexit.register(self.shutdown)
 
 	def initialize(self):
 		if bool(self):
@@ -87,13 +87,12 @@ class Executor:
 
 		return self
 
-	def shutdown(self, wait: bool = True, *, timeout: Optional[float] = None):
+	def shutdown(self, wait: bool = True):
 		assert bool(self), "Already shutdowned or not initialized yet"
 
 		if wait:
 			for t in self._workers:
-				t.join(timeout=timeout)
-				del t
+				t.join(timeout=0)
 
 		self._workers.clear()
 
@@ -174,7 +173,7 @@ class Executor:
 		return self.initialize()
 
 	def __exit__(self, *args):
-		self.shutdown(timeout=1/self._max_workers)
+		self.shutdown()
 
 	async def __aenter__(self):
 		return self.__enter__()
