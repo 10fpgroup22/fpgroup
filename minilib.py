@@ -125,14 +125,16 @@ class Runner:
 
 		return [obj, ar, kw]
 
+	def _create_item(self, func: Function, *args, **kwargs):
+		item = self._Item(*self.build(func, *args, **kwargs))
+		self._queue.put(item)
+		return item
+
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
-		assert len(funcs) > 0 and len(self._workers) > 0
+		assert len(funcs) > 0 and bool(self)
 		results = []
-		items = list(map(lambda fn: self._Item(*self.build(fn, *args, **kwargs)), funcs))
-
-		for item in items:
-			self._queue.put(item)
+		items = list(map(self._create_item(func, *args, **kwargs), set(funcs)))
 
 		for f in as_completed(items, timeout=10):
 			results.append((f.result(), f.func))
