@@ -92,7 +92,7 @@ class Executor:
 
 		if wait:
 			for t in self._workers:
-				t.join(timeout=0)
+				t.join(timeout=1/(10 * self._max_workers))
 
 		self._workers.clear()
 
