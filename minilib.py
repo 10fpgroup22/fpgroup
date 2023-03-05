@@ -23,7 +23,7 @@ c.setFormatter(logging.Formatter(
 logger.addHandler(c)
 
 
-class Runner:
+class Executor:
 	class _Item(Future):
 		def __init__(self, func, args, kwargs):
 			super().__init__()
@@ -48,18 +48,28 @@ class Runner:
 			else:
 				self.set_result(result)
 
+		def reset(self):
+			self._state = "PENDING"
+			self._result = None
+			self._exception = None
+			return self
+
 		def __repr__(self):
 			return super().__repr__().replace(self.__class__.__name__, "Future")
 
+	STANDART = 0
+	INFINITE = 1
+
 	_queue: Queue = Queue()
+	_infinite: Queue = Queue()
 	_max_workers: int = 8
 	_workers: set[Thread] = set()
 
 	def __init__(self, queue: Optional[Queue] = None, *, max_workers: int = _max_workers):
 		assert max_workers > 0, "'max_workers' must more than zero"
-		atexit.register(self.__exit__)
 		self._queue = queue or self._queue
 		self._max_workers = max_workers
+		atexit.register(self.shutdown, timeout=1/self._max_workers)
 		self.initialize()
 
 	def initialize(self):
@@ -67,14 +77,18 @@ class Runner:
 			return self
 
 		for _ in range(max(self._max_workers, 1)):
-			worker = Thread(target=self._worker, daemon=True)
+			worker = Thread(target=self._worker)
 			worker.start()
 			self._workers.add(worker)
+
+		worker = Thread(target=self._worker, args=(Executor.INFINITE,))
+		worker.start()
+		self._workers.add(worker)
 
 		return self
 
 	def shutdown(self, wait: bool = True, *, timeout: Optional[float] = None):
-		assert bool(self), "Already shutdowned"
+		assert bool(self), "Already shutdowned or not initialized yet"
 
 		if wait:
 			for t in self._workers:
@@ -83,13 +97,16 @@ class Runner:
 
 		self._workers.clear()
 
-	def _worker(self):
+	def _worker(self, worker_type: int = STANDART):
+		queue = self._infinite if worker_type == Executor.INFINITE else self._queue
 		loop = asyncio.new_event_loop()
 		while True:
-			item = self._queue.get()
-			if item is not None:
-				item.run(loop)
-				del item
+			item = queue.get()
+			item.run(loop)
+			if worker_type == Executor.INFINITE:
+				queue.put(item.reset())
+				continue
+			del item
 		loop.close()
 
 	@staticmethod
@@ -111,12 +128,12 @@ class Runner:
 			ar += list(args[len(_args) - func:])
 
 		kw.update({
-			k: kwargs.get(k, kw.get(k, None))
-			for k in _kwargs
+			k: kwargs[k]
+			for k in _kwargs if k in kwargs
 		})
 		if spec.varkw:
 			kw.update({
-				k: kwargs.get(k, kw.get(k, None))
+				k: kwargs[k]
 				for k in kwargs.keys()
 				if k not in _args
 			})
@@ -127,17 +144,24 @@ class Runner:
 
 	def _create_item(self, func: Function, *args, **kwargs):
 		item = self._Item(*self.build(func, *args, **kwargs))
-		self._queue.put(item)
-		return item
+		if hasattr(func, '_infinite') and func._infinite:
+			self._infinite.put(item)
+			return None
+		else:
+			self._queue.put(item)
+			return item
 
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
 		assert len(funcs) > 0 and bool(self)
 		results = []
-		items = list(map(self._create_item(func, *args, **kwargs), set(funcs)))
+		items = list(filter(bool, map(lambda fn: self._create_item(fn, *args, **kwargs), set(funcs))))
 
-		for f in as_completed(items, timeout=10):
-			results.append((f.result(), f.func))
+		try:
+			for f in as_completed(items):
+				results.append((f.exception() or f.result(), f.func))
+		except TimeoutError:
+			pass
 
 		return results if len(results) > 1 else results[0]
 
@@ -159,22 +183,23 @@ class Runner:
 		self.__exit__(*args)
 
 
-_global_runner = Runner()
-build = Runner.build
+_global_executor = Executor()
+build = Executor.build
 
 
 def init(queue: Optional[Queue] = None, max_workers: int = 8):
-	global _global_runner
-	_global_runner = Runner(queue, max_workers=max_workers)
-	return _global_runner
+	global _global_executor
+	_global_executor = Executor(queue, max_workers=max_workers)
+	return _global_executor
 
 
 def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
-	return _global_runner(funcs, *args, **kwargs)
+	return _global_executor(funcs, *args, **kwargs)
 
 
 def infinite(func: Function):
-	pass
+	func._infinite = True
+	return func
 
 
 def _repr_(func: Function):
@@ -348,7 +373,7 @@ class Loader:
 		return {"_": self.__class__.__name__, **dict(iter(self))}
 
 	def __iter__(self):
-		yield from [(k, getattr(self, k, None)) for k in self.__fields__.values() if hasattr(self, k)]
+		yield from [(a, getattr(self, k, None)) for a, k in self.__fields__.items() if hasattr(self, k)]
 
 	@staticmethod
 	def _get_subclasses_(cls):
@@ -361,11 +386,11 @@ class Loader:
 
 
 if __name__ == '__main__':
+	@infinite
 	async def test():
 		print("test1")
 
 	async def test_with_args(*args):
 		print(*args)
 
-
-	run([test, test_with_args], 123, "Fuck")
+	run([test, test_with_args])
