@@ -1,4 +1,5 @@
 cd ~/fpgroup
+git fetch
 git pull
 clear
 source ../config.ini
