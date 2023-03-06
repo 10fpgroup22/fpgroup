@@ -168,6 +168,9 @@ class Executor:
 		except TimeoutError:
 			pass
 
+		if len(results) == 0:
+			return
+
 		return results if len(results) > 1 else results[0]
 
 	__call__ = run
