@@ -7,6 +7,7 @@ from aiohttp import web, ClientSession
 from gettext import gettext as _
 from minilib import logger
 from os import getenv
+from threading import Condition
 
 app = web.Application()
 deps.setup(app)
@@ -41,7 +42,6 @@ async def get_domain():
 			print(err.reason)
 			return
 		app['domains'] = resp
-		logger.info(f"Domains: {' -> '.join(x for x in resp)}")
 		del resp
 	minilib.infinite.stop()
 
@@ -58,6 +58,10 @@ async def run(log_enabled: bool = False):
 	atexit.register(ngrok.kill)
 
 	minilib.run(get_domain)
+
+	with Condition() as cv:
+		cv.wait_for(lambda: 'domains' in app)
+		print(f"Domains: {' , '.join(' -> '.join(x) for x in app['domains'])}")
 
 	return app
 
