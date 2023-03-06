@@ -25,7 +25,7 @@ async def streams(request):
 
 
 async def get_domain(port: int = 8080):
-	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout")
+	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout", stdout=asyncio.subprocess.PIPE)
 	async with ClientSession() as s:
 		while True:
 			resp = []
@@ -41,7 +41,7 @@ async def get_domain(port: int = 8080):
 				print(err.reason)
 				continue
 			app['domains'] = resp
-			print(f"Domains: {' -> '.join(x for x in resp)}")
+			logger.info(f"Domains: {' -> '.join(x for x in resp)}")
 			del resp
 			break
 
