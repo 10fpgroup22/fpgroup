@@ -74,7 +74,7 @@ async def leave_tag_all(_, msg):
 
 @tg.on_message(filters.command(['add', f'add@{me.username}']) & filters.group)
 async def add_tag_all(_, msg):
-    group = left.setdefault(str(msg.chat.id), [])
+    group = left.get(str(msg.chat.id), [])
     try:
         if str(msg.from_user.id) in group:
             group.remove(str(msg.from_user.id))
