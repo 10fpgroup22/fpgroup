@@ -59,12 +59,6 @@ async def run(log_enabled: bool = False):
 
 	minilib.run(get_domain)
 
-	cv = Condition()
-
-	with cv:
-		cv.wait_for(lambda: 'domains' in app)
-		print(f"Domains: {' , '.join(' -> '.join(x) for x in app['domains'])}")
-
 	return app
 
 if __name__ == '__main__':
