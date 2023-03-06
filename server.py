@@ -26,7 +26,7 @@ async def streams(request):
 
 
 @minilib.infinite
-async def get_domain(port: int = 8080):
+async def get_domain():
 	async with ClientSession() as s:
 		resp = []
 		await asyncio.sleep(1)
@@ -54,10 +54,10 @@ async def run(log_enabled: bool = False):
 	await runner.setup()
 	site = web.TCPSite(runner, 'localhost', PORT)
 	await site.start()
-	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout", stdout=asyncio.subprocess.PIPE)
+	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{PORT} --log=stdout", stdout=asyncio.subprocess.PIPE)
 	atexit.register(ngrok.kill)
 
-	minilib.run(get_domain, PORT)
+	minilib.run(get_domain)
 
 	return app
 
