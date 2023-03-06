@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import deps
 import minilib
 
@@ -24,26 +25,25 @@ async def streams(request):
 	return
 
 
+@minilib.infinite
 async def get_domain(port: int = 8080):
-	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout", stdout=asyncio.subprocess.PIPE)
 	async with ClientSession() as s:
-		while True:
-			resp = []
-			await asyncio.sleep(1)
-			try:
-				async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
-					resp = list(map(
-						lambda x: (x['config']['addr'], x['public_url']), (await r.json()).get('tunnels', [])
-					))
+		resp = []
+		await asyncio.sleep(1)
+		try:
+			async with s.get("http://127.0.0.1:4040/api/tunnels") as r:
+				resp = list(map(
+					lambda x: (x['config']['addr'], x['public_url']), (await r.json()).get('tunnels', [])
+				))
 
-				assert len(resp) > 0
-			except (TimeoutError, AssertionError) as err:
-				print(err.reason)
-				continue
-			app['domains'] = resp
-			logger.info(f"Domains: {' -> '.join(x for x in resp)}")
-			del resp
-			break
+			assert len(resp) > 0
+		except (TimeoutError, AssertionError) as err:
+			print(err.reason)
+			return
+		app['domains'] = resp
+		logger.info(f"Domains: {' -> '.join(x for x in resp)}")
+		del resp
+	minilib.infinite.stop()
 
 
 async def run(log_enabled: bool = False):
@@ -54,6 +54,8 @@ async def run(log_enabled: bool = False):
 	await runner.setup()
 	site = web.TCPSite(runner, 'localhost', PORT)
 	await site.start()
+	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout", stdout=asyncio.subprocess.PIPE)
+	atexit.register(ngrok.kill)
 
 	minilib.run(get_domain, PORT)
 
