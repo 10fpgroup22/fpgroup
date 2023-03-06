@@ -105,7 +105,6 @@ class Executor:
 			if worker_type == Executor.INFINITE:
 				queue.put(item.reset())
 				continue
-			del item
 		loop.close()
 
 	@staticmethod
