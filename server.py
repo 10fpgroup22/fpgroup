@@ -6,7 +6,6 @@ from aiohttp import web, ClientSession
 from gettext import gettext as _
 from minilib import logger
 from os import getenv
-from subprocess import Popen, PIPE
 
 app = web.Application()
 deps.setup(app)
@@ -25,7 +24,8 @@ async def streams(request):
 	return
 
 
-async def get_domain():
+async def get_domain(port: int = 8080):
+	ngrok = await asyncio.create_subprocess_shell(f"ngrok http localhost:{port} --log=stdout")
 	async with ClientSession() as s:
 		while True:
 			resp = []
@@ -49,13 +49,13 @@ async def get_domain():
 async def run(log_enabled: bool = False):
 	PORT = getenv("PORT", 8080)
 	app.add_routes(routes)
-	minilib.register_exit(Popen(["ngrok", "http", f"localhost:{PORT}", "--log=stdout"], stdout=PIPE).kill)
-	minilib.run(get_domain)
 
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, 'localhost', PORT)
 	await site.start()
+
+	minilib.run(get_domain, PORT)
 
 	return app
 

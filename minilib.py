@@ -10,7 +10,7 @@ from queue import Queue
 from threading import Thread
 from typing import Any, Optional, Union, Iterable, Coroutine, Callable
 
-__all__ = ["Dispatcher", "Loader", "Function", "build", "get_pattern", "run"]
+__all__ = ["Dispatcher", "Executor", "Loader", "Function", "logger", "infinite", "init", "build", "get_pattern", "run"]
 
 Function = Union[Callable, Coroutine]
 
@@ -21,6 +21,10 @@ c.setFormatter(logging.Formatter(
 	datefmt="%H:%M:%S %d.%m.%y"
 ))
 logger.addHandler(c)
+
+
+class StopInfinite(Exception):
+	pass
 
 
 class Executor:
@@ -42,9 +46,13 @@ class Executor:
 				result = self.func(*self.args, **self.kwargs)
 				if inspect.iscoroutinefunction(self.func):
 					result = loop.run_until_complete(result)
+			except StopInfinite:
+				if getattr(self.func, '_infinite', False):
+					self = None
+				else:
+					raise AssertionError("'StopInfinite' exception used only for infinite functions")
 			except BaseException as e:
 				self.set_exception(e)
-				self = None
 			else:
 				self.set_result(result)
 
@@ -101,7 +109,7 @@ class Executor:
 		while True:
 			item = queue.get()
 			item.run(loop)
-			if worker_type == Executor.INFINITE:
+			if worker_type == Executor.INFINITE and item != None:
 				queue.put(item.reset())
 				continue
 		loop.close()
@@ -141,12 +149,12 @@ class Executor:
 
 	def _create_item(self, func: Function, *args, **kwargs):
 		item = self._Item(*self.build(func, *args, **kwargs))
-		if hasattr(func, '_infinite') and func._infinite:
+		if getattr(func, '_infinite', False):
 			self._infinite.put(item)
 			return None
-		else:
-			self._queue.put(item)
-			return item
+		
+		self._queue.put(item)
+		return item
 
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
@@ -194,20 +202,16 @@ def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 	return _global_executor(funcs, *args, **kwargs)
 
 
-def register_exit(func: Function, *args, **kwargs):
-	fn, ar, kw = build(func, *args, **kwargs)
-	atexit.register(fn, *ar, **kw)
-	return func
-
-
-def unregister_exit(func: Function):
-	atexit.unregister(func)
-	return func
+def _stop():
+	raise StopInfinite()
 
 
 def infinite(func: Function):
 	func._infinite = True
 	return func
+
+
+infinite.stop = _stop
 
 
 def _repr_(func: Function):
