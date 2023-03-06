@@ -9,7 +9,9 @@
 </head>
 <body>
 	<ul class="nav">
-		<li class="item"></li>
+		<li class="item">
+			<a {% if path == url_for('index') %}class="active" {% endif %}href="{{ url_for('index') }}"></a>
+		</li>
 	</ul>
 	{%- block body %}{% endblock %}
 </body>

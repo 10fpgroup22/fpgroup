@@ -44,7 +44,14 @@ async def start_private(_, msg):
 
 @tg.on_message(filters.command(['all', f'all@{me.username}']) & filters.group)
 async def all_group(_, msg: types.Message):
-    if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat:
+    try:
+        member = await msg.chat.get_member(msg.from_user.id)
+    except err.RPCError as rpc:
+        member = None
+        print(f"<{rpc}>")
+
+    if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat \
+        or member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]:
         chat = left.get(str(msg.chat.id), [])
         await tg.send_message(
             msg.chat.id,

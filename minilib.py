@@ -65,9 +65,8 @@ class Executor:
 	_max_workers: int = 8
 	_workers: set[Thread] = set()
 
-	def __init__(self, queue: Optional[Queue] = None, *, max_workers: int = _max_workers):
+	def __init__(self, *, max_workers: int = _max_workers):
 		assert max_workers > 0, "'max_workers' must more than zero"
-		self._queue = queue or self._queue
 		self._max_workers = max_workers
 		self.initialize()
 		atexit.register(self.shutdown)
@@ -185,14 +184,25 @@ _global_executor = Executor()
 build = Executor.build
 
 
-def init(queue: Optional[Queue] = None, max_workers: int = 8):
+def init(max_workers: int = 8):
 	global _global_executor
-	_global_executor = Executor(queue, max_workers=max_workers)
+	_global_executor = Executor(max_workers=max_workers)
 	return _global_executor
 
 
 def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 	return _global_executor(funcs, *args, **kwargs)
+
+
+def register_exit(func: Function, *args, **kwargs):
+	fn, ar, kw = build(func, *args, **kwargs)
+	atexit.register(fn, *ar, **kw)
+	return func
+
+
+def unregister_exit(func: Function):
+	atexit.unregister(func)
+	return func
 
 
 def infinite(func: Function):

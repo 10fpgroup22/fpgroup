@@ -1,9 +1,9 @@
 import asyncio
-import atexit
 import deps
 import minilib
 
 from aiohttp import web, ClientSession
+from gettext import gettext as _
 from minilib import logger
 from os import getenv
 from subprocess import Popen, PIPE
@@ -19,8 +19,10 @@ async def index(request):
 	return
 
 
-async def shutdown(_):
-	app['ngrok'].kill()
+@routes.get('/streams')
+@deps.template('streams.html')
+async def streams(request):
+	return
 
 
 async def get_domain():
@@ -35,28 +37,25 @@ async def get_domain():
 					))
 
 				assert len(resp) > 0
-			except (TimeoutError, AssertionError):
+			except (TimeoutError, AssertionError) as err:
+				print(err.reason)
 				continue
 			app['domains'] = resp
-			print(f"Domains: {' -> '.join(x) for x in resp}")
+			print(f"Domains: {' -> '.join(x for x in resp)}")
 			del resp
 			break
 
 
-async def run(block: bool = False, *, log_enabled: bool = False):
+async def run(log_enabled: bool = False):
 	PORT = getenv("PORT", 8080)
 	app.add_routes(routes)
-	app['ngrok'] = Popen(["ngrok", "http", f"localhost:{PORT}", "--log=stdout"], stdout=PIPE)
+	minilib.register_exit(Popen(["ngrok", "http", f"localhost:{PORT}", "--log=stdout"], stdout=PIPE).kill)
 	minilib.run(get_domain)
 
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, 'localhost', PORT)
 	await site.start()
-
-	if block:
-		while True:
-			await asyncio.sleep(.1)
 
 	return app
 

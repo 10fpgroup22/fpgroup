@@ -4,3 +4,4 @@ sqlalchemy>=1.4.46
 pyrogram>=2.0.57
 tgcrypto>=1.2.3
 discord>=2.1.0
+Babel>=2.10.3

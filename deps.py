@@ -65,6 +65,7 @@ async def processor(request):
 def setup(app: web.Application, *, app_key: str = APP_KEY, static: str = "static", templates: str = "templates"):
 	templates = FileSystemLoader([templates] if isinstance(templates, str) else templates) if templates else None
 	app.router.add_static("/static", static, name='static')
+	app.middlewares.append(request_handler)
 
 	env = aiojinja.setup(app, app_key=app_key, loader=templates,
 						 context_processors=[processor], default_helpers=False)
