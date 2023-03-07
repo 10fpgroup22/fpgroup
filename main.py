@@ -51,7 +51,7 @@ async def all_group(_, msg: types.Message):
         print(f"<{rpc}>")
 
     if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat \
-        or member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]:
+        or (member and member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]):
         chat = left.get(str(msg.chat.id), [])
         await tg.send_message(
             msg.chat.id,

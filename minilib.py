@@ -159,19 +159,24 @@ class Executor:
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
 		assert len(funcs) > 0 and bool(self)
-		results = []
 		items = list(filter(bool, map(lambda fn: self._create_item(fn, *args, **kwargs), set(funcs))))
 
-		try:
-			for f in as_completed(items):
-				results.append((f.exception() or f.result(), f.func))
-		except TimeoutError:
-			pass
-
-		if len(results) == 0:
+		if len(items) == 0:
 			return
 
+		results = []
+
+		try:
+			for f in as_completed(items, timeout=30):
+				results.append((f.exception() or f.result(), f.func))
+		except TimeoutError:
+			res_funcs = list(map(lambda res: res[1], results))
+			for item in items:
+				if item.func not in res_funcs:
+					results.append((item, item.func))
+
 		return results if len(results) > 1 else results[0]
+
 
 	__call__ = run
 
