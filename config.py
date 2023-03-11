@@ -1,4 +1,4 @@
-from os.path import abspath, dirname
+from os.path import abspath, dirname, join
 from pyrogram import types, emoji
 
 sdir = abspath(dirname(__file__))
