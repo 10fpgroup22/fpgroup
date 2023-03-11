@@ -4,7 +4,6 @@ import minilib
 
 from deps import Settings
 from discord import Client as DSClient, Intents, File
-from json import dump, load, JSONDecodeError
 from os import getenv
 from pyrogram import Client as TGClient, errors as err, enums, filters
 
