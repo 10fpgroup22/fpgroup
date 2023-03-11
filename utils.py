@@ -12,13 +12,13 @@ from pyrogram import Client as TGClient, errors as err, enums, filters
 tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""), max_concurrent_transmissions=4)
 ds = DSClient(intents=Intents.all())
 
+from config import *
+
 with tg:
     global admins
     me = tg.get_me()
     admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
     print(f"@{me.username} started")
-
-from config import *
 
 
 async def edit_photo(msg, photo="", caption="", reply_markup=None):
