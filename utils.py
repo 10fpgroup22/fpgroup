@@ -2,7 +2,6 @@ import asyncio
 import inspect
 import minilib
 
-from deps import Settings
 from discord import Client as DSClient, Intents, File
 from os import getenv
 from pyrogram import Client as TGClient, errors as err, enums, filters

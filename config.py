@@ -1,3 +1,4 @@
+from deps import Settings
 from json import dump, load, JSONDecodeError
 from os.path import abspath, dirname, join
 from pyrogram import types, emoji
