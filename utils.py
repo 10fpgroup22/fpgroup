@@ -19,17 +19,6 @@ with tg:
     admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
     print(f"@{me.username} started")
 
-try:
-    with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
-        dt = load(fl)
-        chats = dt.get('chats', {})
-        left = dt.get('left', {})
-        settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
-except (IOError, JSONDecodeError):
-    settings = Settings()
-    chats = {}
-    left = {}
-
 
 async def edit_photo(msg, photo="", caption="", reply_markup=None):
     try:
