@@ -2,7 +2,6 @@ import asyncio
 import inspect
 import minilib
 
-from config import *
 from deps import Settings
 from discord import Client as DSClient, Intents, File
 from json import dump, load, JSONDecodeError
@@ -18,6 +17,8 @@ with tg:
     me = tg.get_me()
     admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
     print(f"@{me.username} started")
+
+from config import *
 
 
 async def edit_photo(msg, photo="", caption="", reply_markup=None):
