@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import aiohttp_jinja2 as aiojinja
 
 from aiohttp import web, hdrs
@@ -10,6 +9,8 @@ from typing import Any, Optional, Union, Type
 APP_KEY = "aiojinja2"
 
 if not hasattr(asyncio, 'coroutine'):
+	import inspect
+
 	def coroutine(func):
 		if inspect.iscoroutinefunction(func):
 			return func

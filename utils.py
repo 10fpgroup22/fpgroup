@@ -1,5 +1,4 @@
 import asyncio
-import inspect
 import minilib
 
 from discord import Client as DSClient, Intents, File
