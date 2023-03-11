@@ -1,5 +1,6 @@
 from os.path import abspath, dirname, join
 from pyrogram import types, emoji
+from utils import settings
 
 sdir = abspath(dirname(__file__))
 group_id = -1001558155556
