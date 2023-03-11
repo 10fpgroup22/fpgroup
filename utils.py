@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import minilib
 
+from config import *
 from deps import Settings
 from discord import Client as DSClient, Intents, File
 from json import dump, load, JSONDecodeError
