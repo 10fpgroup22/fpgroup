@@ -20,7 +20,7 @@ async def group_handler(_, msg):
         print(f"Occurred <{rpc}>")
 
 
-@tg.on_message(filters.chat("acl_chat") & filters.new_chat_members)
+@tg.on_message(filters.chat("acl_chat") & filters.new_chat_member)
 async def new_chat_member(_, msg):
     welcome = await tg.send_message(
         msg.chat.id,
