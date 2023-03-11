@@ -236,7 +236,6 @@ async def callback_query(_, qry):
         await msg.delete()
         if qry.data.endswith("approve"):
             news = 1043945356305629317 if user.username == "python_bot_coder" else news_id
-            news = await ds.fetch_channel(news)
             text = ds_msg.text
             file, files = None, None
 
@@ -248,9 +247,9 @@ async def callback_query(_, qry):
                 file = File(await ds_msg.download())
                 text = ds_msg.caption
 
-            await news.send(getattr(text, "markdown", text), file=file, files=files,
+            await ds.get_channel(news).send(getattr(text, "markdown", text), file=file, files=files,
                             suppress_embeds=True)
-            del file, files, news
+            del file, files, news, text,
 
         if bool(ds_msg.media_group_id):
             await asyncio.gather(*[m.delete() for m in (await ds_msg.get_media_group())])

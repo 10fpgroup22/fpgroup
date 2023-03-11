@@ -1,3 +1,4 @@
+from bcrypt import kdf
 from sqlalchemy import *
 from sqlalchemy.orm import declarative_base as base
 
@@ -16,7 +17,10 @@ class User(Base):
 	steam_id = Column(Integer(17))
 
 	def set_password(self, password: str):
-		self.password = password
+		self.password = kdf(password=bytes(password), **kdf_settings)
+
+	def check_password(self, password: str):
+		return self.password == kdf(password=bytes(password), **kdf_settings)
 
 	def __repr__(self):
 		user_id = self.user_id
