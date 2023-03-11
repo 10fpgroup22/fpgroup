@@ -6,7 +6,7 @@ from utils import *
 LINK_RE = re.compile(r"(https://)?t.me/(c/)?(?P<username>[0-9]+|[a-z0-9_]+)/(?P<message>[0-9]+)")
 
 
-@tg.on_message(filters.chat(group_id) & (filters.new_chat_members | filters.left_chat_members), group=-1)
+@tg.on_message(filters.chat(group_id) & (filters.new_chat_members | filters.left_chat_member), group=-1)
 async def admin_group_handler(_, msg):
     global admins
     admins = [mbr.user.id async for mbr in tg.get_chat_members(msg.chat.id) if not mbr.user.is_bot]
@@ -20,7 +20,7 @@ async def group_handler(_, msg):
         print(f"Occurred <{rpc}>")
 
 
-@tg.on_message(filters.chat("acl_chat") & filters.new_chat_member)
+@tg.on_message(filters.chat("acl_chat") & filters.new_chat_members)
 async def new_chat_member(_, msg):
     welcome = await tg.send_message(
         msg.chat.id,
