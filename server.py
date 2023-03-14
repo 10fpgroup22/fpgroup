@@ -43,8 +43,8 @@ async def get_domain():
 			return
 		app['domains'] = resp
 		del resp
-	minilib.infinite.stop()
 	print(f"Domains: {' , '.join(' -> '.join(x) for x in app['domains'])}", flush=True)
+	get_domain.stop()
 
 
 async def run(log_enabled: bool = False):
