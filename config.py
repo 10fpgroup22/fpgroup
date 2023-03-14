@@ -12,12 +12,10 @@ try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
         chats = dt.get('chats', {})
-        left = dt.get('left', {})
         settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
     settings = Settings()
     chats = {}
-    left = {}
 
 emojis = list(filter(lambda x: not x.startswith('_'), dir(emoji)))
 
