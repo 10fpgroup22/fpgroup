@@ -49,6 +49,7 @@ class Executor:
 			except StopInfinite:
 				if getattr(self.func, '_infinite', False):
 					self = None
+					raise
 				else:
 					raise AssertionError("'StopInfinite' exception used only for infinite functions")
 			except BaseException as e:
@@ -108,10 +109,12 @@ class Executor:
 		loop = asyncio.new_event_loop()
 		while True:
 			item = queue.get()
-			item.run(loop)
+			try:
+				item.run(loop)
+			except StopInfinite:
+				continue
 			if worker_type == Executor.INFINITE and item != None:
 				queue.put(item.reset())
-				continue
 		loop.close()
 
 	@staticmethod
@@ -216,10 +219,8 @@ def _stop():
 
 def infinite(func: Function):
 	func._infinite = True
+	func.stop = _stop
 	return func
-
-
-infinite.stop = _stop
 
 
 def _repr_(func: Function):
@@ -409,6 +410,7 @@ if __name__ == '__main__':
 	@infinite
 	async def test():
 		print("test1")
+		test.stop()
 
 	async def test_with_args(*args):
 		print(*args)
