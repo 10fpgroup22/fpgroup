@@ -78,9 +78,9 @@ async def leave_tag_all(_, msg):
             text = "Я итак тебя не отмечаю"
     except err.RPCError as rpc:
         if msg.sender_chat:
-            text = "Так как ты являешся --анонимным-- администратором, я итак не могу отметить тебя"
+            text = "Так как ты являешся --анонимным-- администратором, я не могу отметить тебя"
         else:
-            text = "Что-то пошло не так"
+            text = "Что-то пошло не так. Попробуй позже"
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
@@ -97,7 +97,7 @@ async def add_tag_all(_, msg):
         if msg.sender_chat:
             text = "Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
         else:
-            text = "Что-то пошло не так"
+            text = "Что-то пошло не так. Попробуй позже"
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
