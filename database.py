@@ -188,7 +188,3 @@ def update_status(admins: list[int]):
 if __name__ == '__main__':
 	metadata.create_all(engine)
 	session.commit()
-
-	admins = [730998279, 1695355296, 577069081, 5466500044, 5529367205, 1321552989, 765948742]
-	update_status(admins)
-	# print(session.query(User).filter(User.telegram_id.not_in(admins)).all())
