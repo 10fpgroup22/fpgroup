@@ -58,7 +58,7 @@ async def all_group(_, msg: types.Message):
         await tg.send_message(
             msg.chat.id,
             "Брат, я тебя призываю\n" +
-            "".join([u.user.mention(getattr(emoji, choice(emojis), '🫥'))
+            "".join([ь.user.mention(getattr(emoji, choice(emojis), '🫥'))
                      async for m in msg.chat.get_members() if m.user.id not in chat and not m.user.is_bot])
         )
 
