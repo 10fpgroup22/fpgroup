@@ -10,11 +10,13 @@ tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH
 ds = DSClient(intents=Intents.all())
 
 from config import *
+from database import *
 
 with tg:
     global admins
     me = tg.get_me()
-    admins = [mbr.user.id for mbr in (tg.get_chat_members(group_id)) if not mbr.user.is_bot]
+    admins = [mbr.user.id for mbr in tg.get_chat_members(group_id) if not mbr.user.is_bot]
+    update_status(admins)
     print(f"@{me.username} started")
 
 

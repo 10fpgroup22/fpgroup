@@ -2,7 +2,10 @@ from bcrypt import kdf
 from os import getenv
 from sqlalchemy import *
 from sqlalchemy.orm import declarative_base as base, sessionmaker, relationship
-from typing import Union
+from typing import Union, Any
+
+__all__ = ["Team", "User", "Chat", "session", "update_status"]
+
 
 engine = create_engine("sqlite:///bot.db")
 metadata = MetaData()
@@ -15,14 +18,20 @@ kdf_settings = {
 	"rounds": 100
 }
 
-
 left_tags = Table(
 	"left", metadata,
 	Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
 	Column("chat_id", Integer, ForeignKey("chat.id"), primary_key=True)
 )
 
-class Team(Base):
+
+class FieldMixin(object):
+	@classmethod
+	def from_field(cls, field: Union[str, Column], value: Any):
+		return session.query(cls).filter(getattr(cls, field, field) == value).all()
+
+
+class Team(Base, FieldMixin):
 	__tablename__ = "team"
 
 	id = Column(Integer, primary_key=True)
@@ -37,16 +46,16 @@ class Team(Base):
 
 	def remove_user(self, user: "User"):
 		if user in self.members:
-			self.members.remove(user)
 			if user.id == self.owner and len(self.members) > 0:
 				self.owner = self.members[-1].id
+			self.members.remove(user)
 		if len(self.members) == 0:
 			session.delete(self)
 		session.commit()
 		return self
 
-	def promote(self, user: "User", admin: "User"):
-		if self.owner == owner.id:
+	def promote(self, user: "User", promoter: "User"):
+		if self.owner == promoter.id:
 			self.owner = user.id
 			session.commit()
 			return True
@@ -62,7 +71,7 @@ class Team(Base):
 		return f"<Team {id=}, {name=}>"
 
 
-class Chat(Base):
+class Chat(Base, FieldMixin):
 	__tablename__ = "chat"
 
 	id = Column(Integer, primary_key=True)
@@ -72,15 +81,15 @@ class Chat(Base):
 		return list(map(lambda user: user.telegram_id, self.left))
 
 	@classmethod
-	def from_telegram_id(cls, telegram_id: int):
-		obj = session.query(cls).filter(cls.telegram_id == telegram_id).all()
-		if len(obj) == 0:
-			obj = cls(telegram_id=telegram_id)
-			session.add(obj)
+	def from_telegram(cls, telegram_id: int):
+		chat = cls.from_field('telegram_id', telegram_id)
+		if len(chat) == 0:
+			chat = cls(telegram_id=telegram_id)
+			session.add(chat)
 			session.commit()
 		else:
-			obj = obj[0]
-		return obj
+			chat = chat[0]
+		return chat
 
 	def __contains__(self, item):
 		return item in self.left
@@ -91,7 +100,7 @@ class Chat(Base):
 		return f"<Chat {id=}, {telegram_id}>"
 
 
-class User(Base):
+class User(Base, FieldMixin):
 	__tablename__ = "user"
 
 	id = Column(Integer, primary_key=True)
@@ -100,7 +109,7 @@ class User(Base):
 							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left")
 	username = Column(String(32), nullable=True, unique=True)
 	password = Column(String(64), nullable=True)
-	status = Column(Integer, CheckConstraint("0 <= status <= 3"))
+	status = Column(Integer, CheckConstraint("0 <= status <= 3"), default=0)
 	team_id = Column(Integer, ForeignKey("team.id"), nullable=True)
 	steam_id = Column(String(17), nullable=True, unique=True)
 
@@ -119,6 +128,7 @@ class User(Base):
 	def leave_team(self):
 		self.team_id = None
 		session.commit()
+		return self
 
 	def create_team(self, name: str):
 		if self.team_id != None:
@@ -130,20 +140,13 @@ class User(Base):
 		session.commit()
 		return True
 
-	def left_chat_tag(self, chat: Union[Chat, int]):
+	def leave_chat_tag(self, chat: Union[Chat, int]):
 		if isinstance(chat, Chat) and chat not in self.left_tags:
 			self.left_tags.append(chat)
 			session.commit()
 			return True
 		elif isinstance(chat, int):
-			_chat = session.query(Chat).filter(Chat.telegram_id == chat).all()
-			if len(_chat) == 0:
-				_chat = Chat(telegram_id=chat)
-				session.add(_chat)
-				session.commit()
-			else:
-				_chat = _chat[0]
-			return self.left_chat_tag(_chat)
+			return self.leave_chat_tag(Chat.from_telegram(chat))
 		return False
 
 	def add_chat_tag(self, chat: Union[Chat, int]):
@@ -152,19 +155,19 @@ class User(Base):
 			session.commit()
 			return True
 		elif isinstance(chat, int):
-			return self.add_chat_tag(Chat.from_telegram_id(chat))
+			return self.add_chat_tag(Chat.from_telegram(chat))
 		return False
 
 	@classmethod
-	def from_telegram_id(cls, telegram_id: int):
-		obj = session.query(cls).filter(cls.telegram_id == telegram_id).all()
-		if len(obj) == 0:
-			obj = cls(telegram_id=telegram_id)
-			session.add(obj)
+	def from_telegram(cls, telegram_id: int):
+		user = cls.from_field('telegram_id', telegram_id)
+		if len(user) == 0:
+			user = cls(telegram_id=telegram_id)
+			session.add(user)
 			session.commit()
 		else:
-			obj = obj[0]
-		return obj
+			user = user[0]
+		return user
 
 	def __repr__(self):
 		id = self.id
@@ -173,9 +176,19 @@ class User(Base):
 		return f"<User {id=}, {username=}, {current_team=}>"
 
 
-if __name__ == '__main__':
-	# metadata.create_all(engine)
-	# session.commit()
+def update_status(admins: list[int]):
+	for admin_id in admins:
+		admin = User.from_telegram(admin_id)
+		admin.status = 3
 
-	chat = session.query(Chat).filter(Chat.id==1).all()
-	print(chat[0].left)
+	session.query(User).filter(User.status==3, User.telegram_id.not_in(admins)).update({User.status: 0})
+	session.commit()
+
+
+if __name__ == '__main__':
+	metadata.create_all(engine)
+	session.commit()
+
+	admins = [730998279, 1695355296, 577069081, 5466500044, 5529367205, 1321552989, 765948742]
+	update_status(admins)
+	# print(session.query(User).filter(User.telegram_id.not_in(admins)).all())

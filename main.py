@@ -11,6 +11,7 @@ LINK_RE = re.compile(r"(https://)?t.me/(c/)?(?P<username>[0-9]+|[a-z0-9_]+)/(?P<
 async def admin_group_handler(_, msg):
     global admins
     admins = [mbr.user.id async for mbr in tg.get_chat_members(msg.chat.id) if not mbr.user.is_bot]
+    update_status(admins)
 
 
 @tg.on_message(filters.service & ~filters.private & ~filters.chat("fpg_tournament"), group=-1)
@@ -45,15 +46,14 @@ async def start_private(_, msg):
 
 @tg.on_message(filters.command(['all', f'all@{me.username}']) & filters.group)
 async def all_group(_, msg: types.Message):
-    try:
+    if msg.from_user:
         member = await msg.chat.get_member(msg.from_user.id)
-    except err.RPCError as rpc:
-        member = None
-        print(f"<{rpc}>")
+    elif msg.sender_chat:
+        member = True
 
     if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat \
-        or (member and member.status in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]):
-        chat = Chat.from_telegram_id(msg.chat.id).get_tags()
+        or (member and getattr(member, 'status', enums.ChatMemberStatus.ADMINISTRATOR) in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]):
+        chat = Chat.from_telegram(msg.chat.id).get_tags()
         await tg.send_message(
             msg.chat.id,
             "Брат, я тебя призываю\n" +
@@ -69,33 +69,34 @@ async def all_group(_, msg: types.Message):
 
 @tg.on_message(filters.command(['leave', f'leave@{me.username}']) & filters.group)
 async def leave_tag_all(_, msg):
-    group = Chat.from_telegram_id(msg.chat.id)
     try:
-        user = User.from_telegram_id(msg.chat.id)
-        if user in group:
-            text = "Я итак тебя не отмечаю"
-        else:
+        user = User.from_telegram(msg.from_user.id)
+        if user.left_chat_tag(msg.chat.id):
             text = "Теперь в этой группе я тебя не отмечу"
+        else:
+            text = "Я итак тебя не отмечаю"
     except err.RPCError as rpc:
         if msg.sender_chat:
             text = "Так как ты являешся --анонимным-- администратором, я итак не могу отметить тебя"
+        else:
+            text = "Что-то пошло не так"
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
 
 @tg.on_message(filters.command(['add', f'add@{me.username}']) & filters.group)
 async def add_tag_all(_, msg):
-    group = Chat.from_telegram_id(msg.chat.id)
     try:
         user = User.from_telegram_id(msg.from_user.id)
-        if user in group:
-            user.add_chat_tag(group)
+        if user.add_chat_tag(msg.chat.id):
             text = "С этого момента я буду отмечать тебя в группе"
         else:
             text = "Я итак отмечаю тебя в группе, не спамь пожалуйста"
     except err.RPCError as rpc:
         if msg.sender_chat:
             text = "Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
+        else:
+            text = "Что-то пошло не так"
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
