@@ -2,6 +2,7 @@ import re
 
 from database import *
 from random import choice
+from shutil import rmtree
 from utils import *
 
 LINK_RE = re.compile(r"(https://)?t.me/(c/)?(?P<username>[0-9]+|[a-z0-9_]+)/(?P<message>[0-9]+)")
