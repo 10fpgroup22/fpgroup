@@ -104,16 +104,16 @@ class User(Base, FieldMixin):
 	__tablename__ = "user"
 
 	id = Column(Integer, primary_key=True)
-	telegram_id = Column(Integer, unique=True)
-	left_tags = relationship(Chat, secondary=left_tags, primaryjoin="and_(Chat.id==left.c.chat_id, User.id==left.c.user_id)",
-							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left")
 	username = Column(String(32), nullable=True, unique=True)
 	password = Column(String(64), nullable=True)
+	telegram_id = Column(Integer, nullable=True, unique=True)
 	status = Column(Integer, CheckConstraint("0 <= status <= 3"), default=0)
 	team_id = Column(Integer, ForeignKey("team.id"), nullable=True)
 	steam_id = Column(String(17), nullable=True, unique=True)
 
 	team = relationship(Team, foreign_keys=[team_id], backref="members")
+	left_tags = relationship(Chat, secondary=left_tags, primaryjoin="and_(Chat.id==left.c.chat_id, User.id==left.c.user_id)",
+							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left")
 
 	def set_password(self, password: str):
 		self.password = kdf(password=bytes(password), **kdf_settings)
