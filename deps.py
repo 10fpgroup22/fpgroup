@@ -2,8 +2,11 @@ import asyncio
 import aiohttp_jinja2 as aiojinja
 
 from aiohttp import web, hdrs
-from jinja2 import FileSystemLoader, pass_context
+from babel.core import Locale
+from babel.support import Translations
+from jinja2 import FileSystemLoader, pass_context, select_autoescape
 from minilib import Loader, logger
+from os.path import exists, abspath, dirname, join
 from typing import Any, Optional, Union, Type
 
 APP_KEY = "aiojinja2"
@@ -59,18 +62,36 @@ def url_for(context, route: str, query_: Optional[dict[str, str]] = None, **kwar
 	return url
 
 
+@pass_context
+def gettext(context, message):
+	langs, locale = context['languages'], context['locale']
+	return langs.get((locale.language, locale.language_name.capitalize())).ugettext(message)
+
+
+@pass_context
+def ngettext(context, message, plural, count):
+	langs, locale = context['languages'], context['locale']
+	return langs.get((locale.language, locale.language_name.capitalize())).ungettext(message, plural, count)
+
+
 async def processor(request):
-	return {'path': request.rel_url}
+	locale = request.cookies.get('LANGUAGE', request.headers.get('ACCEPT-LANGUAGE', 'en'))[:2]
+	return {'path': request.rel_url, 'locale': Locale.parse(locale)}
 
 
-def setup(app: web.Application, *, app_key: str = APP_KEY, static: str = "static", templates: str = "templates"):
+def setup(app: web.Application, languages: list[str], *, app_key: str = APP_KEY, static: str = "static", templates: str = "templates", locales_path: str = 'locales'):
 	templates = FileSystemLoader([templates] if isinstance(templates, str) else templates) if templates else None
 	app.router.add_static("/static", static, name='static')
 	app.middlewares.append(request_handler)
 
+	languages = list(map(Locale.parse, languages))
+
 	env = aiojinja.setup(app, app_key=app_key, loader=templates,
-						 context_processors=[processor], default_helpers=False)
+						 context_processors=[processor], default_helpers=False,
+						 extensions=['jinja2.ext.i18n'])
+	env.globals['languages'] = {(lang.language, lang.language_name.capitalize()): Translations.load(locales_path, lang) for lang in languages}
 	env.globals["url_for"] = url_for
+	env.install_gettext_callables(gettext, ngettext)
 
 	return env
 

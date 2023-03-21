@@ -2,11 +2,17 @@
 	padding: 0;
 	margin: 0;
 	outline: none;
+	user-select: none;
 }
 
 body{
 	min-height: 100vh;
 	min-width: 100vw;
+}
+
+a{
+	color: black;
+	text-decoration: none;
 }
 
 ul{
@@ -16,10 +22,89 @@ ul{
 ul.nav{
 	height: 40px;
 	width: 100%;
-	background-color: #666;
+	background-color: #0d1721;
 }
 
 ul.nav > li.item{
-	height: 100%;
-	width: min-content;
+	height: inherit;
+	width: max-content;
+	float: left;
+}
+
+ul.nav > li.item > a{
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	text-align: center;
+	height: inherit;
+	padding: 0 16px;
+	color: #f1f1f1;
+}
+
+ul.nav > li.item > a:hover,
+ul.nav > li.item.language:hover > div.dropdown{
+	background-color: black;
+}
+
+ul.nav > li.item.language{
+	float: right;
+}
+
+ul.nav > li.item.language > div.dropdown{
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	min-width: 53.15px;
+	height: inherit;
+	padding: 0 16px;
+	color: #f1f1f1;
+}
+
+ul.nav > li.item.language > div.dropdown::after{
+	content: "";
+	display: block;
+	margin-left: 2px;
+	width: 5px;
+	height: 5px;
+	border-right: 2px solid #f1f1f1;
+	border-bottom: 2px solid #f1f1f1;
+	transform: rotate(45deg);
+	transition: .2s transform ease-in-out;
+}
+
+ul.nav > li.item.language:hover > div.dropdown::after{
+	transform: rotate(-135deg);
+}
+
+ul.nav > li.item.language > div.content{
+	display: none;
+	background-color: black;
+	border-bottom-left-radius: 7px;
+	border-bottom-right-radius: 7px;
+}
+
+ul.nav > li.item.language:hover > div.content{
+	display: flex;
+	flex-direction: column;
+}
+
+ul.nav > li.item.language > div.content > button{
+	background-color: transparent;
+	width: 100%;
+	border: none;
+	border-radius: none;
+	padding: 0 5px;
+	font-size: 15px;
+	color: #f1f1f1;
+}
+
+ul.nav > li.item.language > div.content > button:last-child{
+	padding-bottom: 3px;
+	border-bottom-right-radius: 8px;
+	border-bottom-left-radius: 8px;
+}
+
+ul.nav > li.item.language > div.content > button:hover{
+	background-color: rgb(33, 23, 13);
 }

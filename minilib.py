@@ -48,7 +48,6 @@ class Executor:
 					result = loop.run_until_complete(result)
 			except StopInfinite:
 				if getattr(self.func, '_infinite', False):
-					self = None
 					raise
 				else:
 					raise AssertionError("'StopInfinite' exception used only for infinite functions")
@@ -84,7 +83,7 @@ class Executor:
 		if bool(self):
 			return self
 
-		for _ in range(max(self._max_workers, 1)):
+		for _ in range(max(self._max_workers - len(self._workers), 1)):
 			worker = Thread(target=self._worker, daemon=True)
 			worker.start()
 			self._workers.add(worker)
@@ -184,7 +183,7 @@ class Executor:
 	__call__ = run
 
 	def __bool__(self):
-		return len(self._workers) > 0
+		return len(self._workers) > 0 and len(self._workers) >= self._max_workers
 
 	def __enter__(self):
 		return self.initialize()
