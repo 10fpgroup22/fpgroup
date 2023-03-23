@@ -1,14 +1,20 @@
 {% extends "_base.html" %}
 
+{% block head %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='auth.css') }}">
+{% endblock %}
+
 {% block body %}
 <div class="auth">
 	<form method="POST">
+		<h4 class="title">{% trans %}Авторизация{% endtrans %}</h4>
 		<label for="username">{% trans %}Имя пользователя:{% endtrans %}</label>
-		<input id="username" type="text" name="username" autocomplete="off" required>
+		<input id="username" type="text" name="username" autocomplete="off" required pattern="[a-zA-Z0-9]" min="8" max="16">
 		<label for="password">{% trans %}Пароль:{% endtrans %}</label>
-		<input id="password" type="password" name="password">
+		<input id="password" type="password" name="password" autocomplete="off" required pattern="[a-zA-Z0-9]" min="8" max="16">
 		<button>{% trans %}Войти{% endtrans %}</button>
 	</form>
-	<script async src="https://telegram.org/js/telegram-widget.js?21" data-telegram-login="ACLFeedbackBot" data-size="medium" data-radius="10" data-auth-url="/auth/telegram"></script>
+	<p class="lined">{% trans %}или войдите с помощью{% endtrans %}</p>
+	<!-- <script async src="https://telegram.org/js/telegram-widget.js?21" data-telegram-login="ACLFeedbackBot" data-size="medium" data-radius="10" data-auth-url="/auth/telegram"></script> -->
 </div>
 {% endblock %}

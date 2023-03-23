@@ -1,3 +1,18 @@
+body *{
+	--text-color: 0, 0, 139;
+	--background-color: 148, 228, 255;
+	--input-text-color: 0, 139, 139;
+	--caret-color: 224, 255, 255;
+	--button-hovered: 126, 126, 159;
+	transition: 1s all ease-in-out;
+}
+
+body.dark *{
+	--text-color: 0, 139, 139;
+	--background-color: 17, 23, 25;
+	--button-hovered: 96, 96, 170;
+}
+
 *, *::before, *::after{
 	padding: 0;
 	margin: 0;
@@ -5,9 +20,15 @@
 	user-select: none;
 }
 
+input{
+	user-select: auto;
+}
+
 body{
 	min-height: 100vh;
 	min-width: 100vw;
+	background-color: rgb(var(--background-color));
+	color: rgb(var(--text-color));
 }
 
 a{
@@ -41,12 +62,20 @@ ul.nav > li.item > a{
 	color: #f1f1f1;
 }
 
-ul.nav > li.item > a:hover,
+ul.nav > li.item > a.active{
+	background-color: #04AA6D;
+}
+
+ul.nav > li.item > a:not(.active):hover,
 ul.nav > li.item.language:hover > div.dropdown{
 	background-color: black;
 }
 
 ul.nav > li.item.language{
+	display: flex;
+	flex-direction: column;
+	background-color: inherit;
+	cursor: pointer;
 	float: right;
 }
 
@@ -55,14 +84,19 @@ ul.nav > li.item.language > div.dropdown{
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
+	position: relative;
+	background-color: inherit;
 	min-width: 53.15px;
 	height: inherit;
 	padding: 0 16px;
 	color: #f1f1f1;
+	z-index: 100;
 }
 
 ul.nav > li.item.language > div.dropdown::after{
 	content: "";
+	position: absolute;
+	right: 11px;
 	display: block;
 	margin-left: 2px;
 	width: 5px;
@@ -78,19 +112,25 @@ ul.nav > li.item.language:hover > div.dropdown::after{
 }
 
 ul.nav > li.item.language > div.content{
-	display: none;
-	background-color: black;
+	display: flex;
+	flex-direction: column;
+	position: absolute;
+	z-index: 1;
+	background-color: #0d1721;
 	border-bottom-left-radius: 7px;
 	border-bottom-right-radius: 7px;
+	transform: translateY(-100%);
+	transition: .3s transform ease-in-out;
 }
 
 ul.nav > li.item.language:hover > div.content{
-	display: flex;
-	flex-direction: column;
+	transform: translateY(40px);
+	background-color: black;
 }
 
 ul.nav > li.item.language > div.content > button{
 	background-color: transparent;
+	cursor: pointer;
 	width: 100%;
 	border: none;
 	border-radius: none;

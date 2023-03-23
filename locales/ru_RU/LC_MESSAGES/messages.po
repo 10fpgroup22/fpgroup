@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2023-03-17 22:41+0200\n"
+"POT-Creation-Date: 2023-03-22 19:51+0200\n"
 "PO-Revision-Date: 2023-03-17 00:22+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru_RU\n"
@@ -19,23 +19,35 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: templates/_base.html:14
+#: templates/_base.html:15
 msgid "Главная"
 msgstr "Главная"
 
-#: templates/_base.html:19
+#: templates/_base.html:20
 msgid "Стримы"
 msgstr "Стримы"
 
-#: templates/auth.html:6
+#: templates/_base.html:25 templates/auth.html:15
+msgid "Войти"
+msgstr "Войти"
+
+#: templates/auth.html:10
+msgid "Авторизация"
+msgstr "Авторизация"
+
+#: templates/auth.html:11
 msgid "Имя пользователя:"
 msgstr "Имя пользователя:"
 
-#: templates/auth.html:8
+#: templates/auth.html:13
 msgid "Пароль:"
 msgstr "Пароль:"
 
-#: templates/auth.html:10
-msgid "Войти"
-msgstr "Войти"
+#: templates/auth.html:17
+msgid "или войдите с помощью"
+msgstr "или войдите с помощью"
+
+#: templates/streams.html:4
+msgid "Данная страница на стадии разработки из-за лени разработчика сайта😋"
+msgstr "Данная страница на стадии разработки из-за лени разработчика сайта😋"
 
