@@ -112,9 +112,8 @@ class User(Base, FieldMixin):
 	team_id = Column(Integer, ForeignKey("team.id"), nullable=True)
 	steam_id = Column(String(17), nullable=True, unique=True)
 
-	team = relationship(Team, foreign_keys=[team_id], backref="members", lazy='dynamic')
-	left_tags = relationship(Chat, secondary=left_tags, primaryjoin="and_(Chat.id==left.c.chat_id, User.id==left.c.user_id)",
-							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left", lazy="dynamic")
+	team = relationship(Team, foreign_keys=[team_id], backref="members")
+	left_tags = relationship(Chat, secondary=left_tags, foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left", lazy="dynamic")
 
 	def set_password(self, password: str):
 		self.password = kdf(password=bytes(password), **kdf_settings)
