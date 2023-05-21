@@ -161,7 +161,7 @@ class Executor:
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
 		assert len(funcs) > 0 and bool(self)
-		items = list(filter(bool, map(lambda fn: self._create_item(fn, *args, **kwargs), set(funcs))))
+		items = list(filter(None, map(lambda fn: self._create_item(fn, *args, **kwargs), set(funcs))))
 
 		if len(items) == 0:
 			return

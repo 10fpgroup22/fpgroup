@@ -4,12 +4,15 @@ import aiohttp_jinja2 as aiojinja
 from aiohttp import web, hdrs
 from babel.core import Locale
 from babel.support import Translations
+from datetime import datetime, timedelta
 from jinja2 import FileSystemLoader, pass_context, select_autoescape
+from json import loads, dumps
 from minilib import Loader, logger
 from os.path import exists, abspath, dirname, join
 from typing import Any, Optional, Union, Type
 
 APP_KEY = "aiojinja2"
+_month = timedelta(days=30)
 
 if not hasattr(asyncio, 'coroutine'):
 	import inspect
@@ -35,8 +38,10 @@ def template(template: str, *, app_key: str = APP_KEY, encoding: str = "utf-8", 
 
 @web.middleware
 async def request_handler(req, handler):
+	req.session = req.cookies.get("SESSION", r"{}")
 	resp = await handler(req)
-	logger.info(f"[{req.remote}] {req.method} {req.url} - {resp.status}")
+	resp.set_cookie("SESSION", req.session, expires=(datetime.utcnow() + _month), samesite="Strict")
+	logger.info(f"[{req.remote}] {req.method} {req.path} - {resp.status}")
 	return resp
 
 
@@ -75,14 +80,14 @@ def ngettext(context, message, plural, count):
 
 
 async def processor(request):
-	locale = request.cookies.get('LANGUAGE', request.headers.get('ACCEPT-LANGUAGE', 'en'))[:2]
-	return {'path': request.rel_url, 'locale': Locale.parse(locale)}
+	locale = request.cookies.get('LANGUAGE', request.headers.get('ACCEPT-LANGUAGE', 'en'))
+	return {'request': request, 'url': str(request.rel_url), 'path': str(request.path), 'locale': Locale.parse(locale)}
 
 
 def setup(app: web.Application, languages: list[str], *, app_key: str = APP_KEY, static: str = "static", templates: str = "templates", locales_path: str = 'locales'):
 	templates = FileSystemLoader([templates] if isinstance(templates, str) else templates) if templates else None
 	app.router.add_static("/static", static, name='static')
-	app.middlewares.append(request_handler)
+	app.middlewares.insert(0, request_handler)
 
 	languages = list(map(Locale.parse, languages))
 

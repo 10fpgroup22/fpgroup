@@ -5,8 +5,7 @@ from pyrogram import types, emoji
 from utils import tg
 
 sdir = abspath(dirname(__file__))
-group_id = -1001558155556
-news_id = 1038752367123898459
+group_id = -722067196
 
 try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:

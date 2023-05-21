@@ -7,7 +7,6 @@ from pyrogram import Client as TGClient, errors as err, enums, filters
 
 
 tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""), max_concurrent_transmissions=4)
-ds = DSClient(intents=Intents.all())
 
 from config import *
 from database import *
@@ -43,8 +42,7 @@ async def run_func(*funcs, timeout=30):
 async def start():
     from server import run
     app = await run()
-    app['discord'], app['telegram'] = ds, tg
-    asyncio.create_task(ds.start(getenv("DISCORD")))
+    app['telegram'] = tg
     await tg.start()
 
     while True:

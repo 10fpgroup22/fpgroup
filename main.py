@@ -116,13 +116,10 @@ async def edited_channel_handler(_, msg):
 
     if bool(msg.media_group_id):
         md_group = await msg.get_media_group()
-        files = await asyncio.gather(*[m.download() for m in (md_group)])
-        files = list(map(lambda f: (File(f)), files))
         text = "\n".join(filter(bool, map(lambda cap: getattr(cap.caption, "markdown", cap.caption), md_group)))
     elif bool(msg.poll):
         text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
     elif bool(msg.media):
-        files = [File(await msg.download())]
         text = msg.caption
 
     if bool(text):
@@ -135,6 +132,11 @@ async def edited_channel_handler(_, msg):
 
     async for dsm in news.history(after=msg.date, limit=10):
         if dsm.content.endswith(msg.link):
+            if bool(msg.media_group_id):
+                files = await asyncio.gather(*[m.download() for m in (md_group)])
+                files = list(map(lambda f: (File(f)), files))
+            elif bool(msg.media) and not bool(msg.poll):
+                files = [File(await msg.download)]
             await dsm.edit(content=f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь {msg.link}",
                            attachments=files, suppress=True)
             edited = True

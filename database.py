@@ -1,11 +1,12 @@
 from bcrypt import kdf
+from datetime import datetime, timedelta
+from jwt import encode, decode
 from os import getenv
 from sqlalchemy import *
 from sqlalchemy.orm import declarative_base as base, sessionmaker, relationship
 from typing import Union, Any
 
 __all__ = ["Team", "User", "Chat", "session", "update_status"]
-
 
 engine = create_engine("sqlite:///bot.db")
 metadata = MetaData()
@@ -111,9 +112,9 @@ class User(Base, FieldMixin):
 	team_id = Column(Integer, ForeignKey("team.id"), nullable=True)
 	steam_id = Column(String(17), nullable=True, unique=True)
 
-	team = relationship(Team, foreign_keys=[team_id], backref="members")
+	team = relationship(Team, foreign_keys=[team_id], backref="members", lazy='dynamic')
 	left_tags = relationship(Chat, secondary=left_tags, primaryjoin="and_(Chat.id==left.c.chat_id, User.id==left.c.user_id)",
-							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left")
+							 foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left", lazy="dynamic")
 
 	def set_password(self, password: str):
 		self.password = kdf(password=bytes(password), **kdf_settings)
@@ -158,6 +159,21 @@ class User(Base, FieldMixin):
 			return self.add_chat_tag(Chat.from_telegram(chat))
 		return False
 
+	@property
+	def token(self):
+		return encode({"id": self.id, "username": self.username, "exp": datetime.utcnow() + timedelta(minutes=1)}, kdf_settings["salt"], algorithm="HS256")
+
+	@classmethod
+	def from_token(cls, token: str):
+		try:
+			payload = decode(token, kdf_settings["salt"], algorithms=["HS256"])
+		except jwt.exceptions.ExpiredSignatureError:
+			return False
+		user = cls.from_field('username', payload['username'])
+		if len(user) == 0:
+			return False
+		return user[0]
+
 	@classmethod
 	def from_telegram(cls, telegram_id: int):
 		user = cls.from_field('telegram_id', telegram_id)
@@ -169,11 +185,57 @@ class User(Base, FieldMixin):
 			user = user[0]
 		return user
 
+	@classmethod
+	def from_username(cls, username: str | None = None, password: str | None = None, **kwargs):
+		username = username or kwargs.pop('username', '')
+		password = password or kwargs.pop('password', '')
+		assert len(username) > 0 and len(password) > 0
+		user = cls.from_field('username', username)
+		if len(user) == 0:
+			user = cls(username=username)
+			user.set_password(password)
+			session.add(user)
+			session.commit()
+			return user
+		else:
+			user = user[0]
+			if user.check_password(password):
+				return user
+		return None
+
+
 	def __repr__(self):
 		id = self.id
 		username = self.username
 		current_team = getattr(self.team, 'name', None)
 		return f"<User {id=}, {username=}, {current_team=}>"
+
+
+class Category(Base):
+	__tablename__ = "settings_category"
+	id = Column(Integer, primary_key=True)
+	name = Column(String, unique=True)
+
+
+class Parameter(Base):
+	__tablename__ = "settings_parameter"
+	id = Column(Integer, primary_key=True)
+	name = Column(String, unique=True)
+	value = Column(String, nullable=False)
+	category_id = Column(Integer, ForeignKey('settings_category.id'), nullable=False)
+
+	category = relationship(Category, backref="parameters")
+
+
+def authorized(func: Function):
+	async def wrapper(request):
+		try:
+			request.user = User.from_token(request.session)
+		except:
+			return web.HTTPUnauthorized()
+		return await func(request)
+
+	return wrapper
 
 
 def update_status(admins: list[int]):

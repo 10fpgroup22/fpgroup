@@ -34,6 +34,25 @@ async def auth(request):
 @routes.post('/auth')
 async def auth(request):
 	data = await request.post()
+	ret = {'type': 'reset', 'status': 'failure'}
+	username, password = data.get('username', ''), data.get('password', '')
+	if 8 <= len(username) <= 16 and 8 <= len(password) <= 32:
+		user = User.from_username(username, password)
+		if user:
+			ret = {
+				'type': 'redirect',
+				'status': 'success',
+				'url': str(deps.url_for({'app': request.app}, 'index'))
+			}
+			request.session = user.token
+	else:
+		username_reason, password_reason = None, None
+		if not 8 <= len(username) <= 16:
+			username_reason = f"username is too {'short' if len(username) < 8 else 'long'}"
+		if not 8 <= len(password) <= 32:
+			password_reason = f"password is too {'short' if len(password) < 8 else 'long'}"
+		ret['reason'] = list(filter(None, [username_reason, password_reason]))
+	return web.json_response(ret, status=(401 if 'reason' in ret else 200))
 
 
 @routes.get('/auth/telegram')
