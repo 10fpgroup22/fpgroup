@@ -10,11 +10,10 @@ group_id = -722067196
 try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
-        chats = dt.get('chats', {})
         settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
+    print("Settings were not loaded, created new")
     settings = Settings()
-    chats = {}
 
 emojis = list(filter(lambda x: not x.startswith('_'), dir(emoji)))
 
