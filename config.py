@@ -10,7 +10,7 @@ group_id = -722067196
 try:
     with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
-        chats = data.get('chats', {})
+        chats = dt.get('chats', {})
         settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
     print("Settings were not loaded, created new")
