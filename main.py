@@ -2,10 +2,7 @@ import re
 
 from database import *
 from random import choice
-from shutil import rmtree
 from utils import *
-
-LINK_RE = re.compile(r"(https://)?t.me/(c/)?(?P<username>[0-9]+|[a-z0-9_]+)/(?P<message>[0-9]+)")
 
 
 @tg.on_message(filters.chat(group_id) & (filters.new_chat_members | filters.left_chat_member), group=-1)
@@ -102,112 +99,8 @@ async def add_tag_all(_, msg):
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
 
-@tg.on_edited_message(filters.chat(["acl_esports", "test_fpg_channel"]) & ~filters.me & ~filters.service)
-async def edited_channel_handler(_, msg):
-    news = 1043945356305629317 if msg.chat.username == "test_fpg_channel" else news_id
-    news = await ds.fetch_channel(news)
-    text = msg.text
-    markup = '\n'.join(
-        f"[{y.text}] {y.url or y.login_url.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
-        for y in x if bool(y.url) or bool(getattr(y.login_url, 'url', None))
-    )
-    file, files = [], []
-    edited = False
-
-    if bool(msg.media_group_id):
-        md_group = await msg.get_media_group()
-        text = "\n".join(filter(bool, map(lambda cap: getattr(cap.caption, "markdown", cap.caption), md_group)))
-    elif bool(msg.poll):
-        text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
-    elif bool(msg.media):
-        text = msg.caption
-
-    if bool(text):
-        text = f"\n{getattr(text, 'markdown', text)}"
-    else:
-        text = ''
-
-    if bool(markup):
-        text += f"\n{markup}"
-
-    async for dsm in news.history(after=msg.date, limit=10):
-        if dsm.content.endswith(msg.link):
-            if bool(msg.media_group_id):
-                files = await asyncio.gather(*[m.download() for m in (md_group)])
-                files = list(map(lambda f: (File(f)), files))
-            elif bool(msg.media) and not bool(msg.poll):
-                files = [File(await msg.download)]
-            await dsm.edit(content=f"||@everyone||{text}\n> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь {msg.link}",
-                           attachments=files, suppress=True)
-            edited = True
-            break
-
-    if not edited:
-        await channel_handler(tg, msg)
-
-    rmtree(join(sdir, 'downloads'), ignore_errors=True)
-    del edited, file, files, news, text
-
-
-@tg.on_message(filters.chat(["acl_esports", "test_fpg_channel"]) & ~filters.me & ~filters.service)
-async def channel_handler(_, msg):
-    kwargs = {}
-    method, text = 'send_message', ''
-    markup = "\n".join(
-        f"[{y.text}] {y.url or y.login_url.url}" for x in getattr(msg.reply_markup, "inline_keyboard", [])
-        for y in x if bool(y.url) or bool(getattr(y.login_url, 'url', None))
-    )
-
-    if bool(msg.media_group_id):
-        md_group = await msg.get_media_group()
-        md_group.sort(key=lambda k: k.id)
-        if msg.id != md_group[-1].id:
-            del kwargs, text, method, md_group
-            return
-        text = "\n".join(filter(bool, map(lambda m: getattr(m.caption, "markdown", ""), md_group)))
-        if bool(text):
-            text = f"\n{text}"
-        kwargs["from_chat_id"] = msg.chat.id
-        kwargs["message_id"] = msg.id
-        kwargs["captions"] = f"||@everyone||{text}\n> Больше здесь <{msg.link}>"
-        method = "copy_media_group"
-        del md_group
-    else:
-        if bool(msg.text):
-            text = msg.text
-        elif bool(msg.poll):
-            text = f"{msg.poll.question}\n" + '\n'.join(f"[{x}] {o.text}" for x, o in enumerate(msg.poll.options, start=1))
-        elif bool(msg.media):
-            text = msg.caption
-            kwargs[msg.media.value] = getattr(msg, msg.media.value).file_id
-            method = f"send_{msg.media.value}"
-
-        if bool(text):
-            text = f"\n{getattr(text, 'markdown', text)}"
-        else:
-            text = ''
-
-        if bool(markup):
-            text += f"\n{markup}"
-
-        kwargs["caption" if bool(msg.media) and not bool(msg.poll) else "text"] = \
-            f"||@everyone||{text}\n" \
-            f"> {'Голосуй' if bool(msg.poll) else 'Больше'} здесь {msg.link}"
-
-    ds_msg = await getattr(tg, method)(
-        ("python_bot_coder" if msg.chat.username == "test_fpg_channel" else 1695355296), **kwargs
-    )
-    del kwargs, text, method
-
-    await (ds_msg if isinstance(ds_msg, types.Message) else ds_msg[0]).reply_text(
-        "Так будет выглядеть сообщение(||кроме последней строчки||) в Дискорд. Хочешь отправить?",
-        reply_markup=markups["discord_send_post"], quote=True
-    )
-
-
 @tg.on_callback_query()
 async def callback_query(_, qry):
-    rmtree(join(sdir, 'downloads'), ignore_errors=True)
     photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
     msg, user = qry.message, qry.from_user
 
@@ -237,31 +130,6 @@ async def callback_query(_, qry):
             markup = list(filter(bool, map(lambda x: (None if x[1] else markups["subscribe"][x[0]]), enumerate(verified))))
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
-    elif qry.data.startswith("discord"):
-        ds_msg = msg.reply_to_message
-        await msg.delete()
-        if qry.data.endswith("approve"):
-            news = 1043945356305629317 if user.username == "python_bot_coder" else news_id
-            text = ds_msg.text
-            file, files = None, None
-
-            if bool(ds_msg.media_group_id):
-                files = await asyncio.gather(*[m.download() for m in (await ds_msg.get_media_group())])
-                files = list(map(lambda f: (File(f)), files))
-                text = ds_msg.caption
-            elif bool(ds_msg.media):
-                file = File(await ds_msg.download())
-                text = ds_msg.caption
-
-            await ds.get_channel(news).send(getattr(text, "markdown", text), file=file, files=files,
-                            suppress_embeds=True)
-            del file, files, news, text,
-
-        if bool(ds_msg.media_group_id):
-            await asyncio.gather(*[m.delete() for m in (await ds_msg.get_media_group())])
-        else:
-            await ds_msg.delete()
-        return
     elif qry.data == "social":
         markup = [
             [types.InlineKeyboardButton(txt, url=url)]
