@@ -1,5 +1,5 @@
 from minilib import Loader
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 
 class Settings(Loader):
