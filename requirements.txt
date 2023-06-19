@@ -1,9 +1,6 @@
-aiohttp>=3.8.3
-aiohttp_jinja2>=1.5
 sqlalchemy>=1.4.46
 pyrogram>=2.0.57
 tgcrypto>=1.2.3
-discord>=2.1.0
 Babel>=2.10.3
 bcrypt>=3.2.2
 PyJWT>=2.6.0

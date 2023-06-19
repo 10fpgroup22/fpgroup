@@ -1,6 +1,7 @@
+# from aiohttp.web import middleware
 from bcrypt import kdf
 from datetime import datetime, timedelta
-from jwt import encode, decode
+from jwt import encode, decode, exceptions
 from os import getenv
 from sqlalchemy import *
 from sqlalchemy.orm import declarative_base as base, sessionmaker, relationship
@@ -19,12 +20,6 @@ kdf_settings = {
 	"rounds": 100
 }
 
-left_tags = Table(
-	"left", metadata,
-	Column("user_id", Integer, ForeignKey("user.id"), primary_key=True),
-	Column("chat_id", Integer, ForeignKey("chat.id"), primary_key=True)
-)
-
 
 class FieldMixin(object):
 	@classmethod
@@ -32,32 +27,43 @@ class FieldMixin(object):
 		return session.query(cls).filter(getattr(cls, field, field) == value).all()
 
 
+class ChatTagging(Base):
+	__tablename__ = "chat_tags"
+
+	user_id = Column(None, ForeignKey('user.id'), primary_key=True)
+	chat_id = Column(None, ForeignKey('chat.id'), primary_key=True)
+	left = Column(Boolean, default=False)
+
+	user = relationship('User', viewonly=True)
+	chat = relationship('Chat', viewonly=True)
+
+
 class Team(Base, FieldMixin):
 	__tablename__ = "team"
 
 	id = Column(Integer, primary_key=True)
 	name = Column(String(64), unique=True)
-	owner = Column(Integer, ForeignKey("user.id"), nullable=False, unique=True)
+	captain = Column(ForeignKey('user.id'), nullable=False)
 
 	def add_user(self, user: "User"):
-		if user not in self.members:
-			self.members.append(user)
+		if user not in self.teammates:
+			self.teammates.append(user)
 			session.commit()
 		return self
 
 	def remove_user(self, user: "User"):
-		if user in self.members:
-			if user.id == self.owner and len(self.members) > 0:
-				self.owner = self.members[-1].id
-			self.members.remove(user)
-		if len(self.members) == 0:
+		if user in self.teammates:
+			if user.id == self.captain and len(self.teammates) > 0:
+				self.captain = self.teammates[-1].id
+			self.teammates.remove(user)
+		if len(self.teammates) == 0:
 			session.delete(self)
 		session.commit()
 		return self
 
 	def promote(self, user: "User", promoter: "User"):
-		if self.owner == promoter.id:
-			self.owner = user.id
+		if self.captain == promoter.id:
+			self.captain = user.id
 			session.commit()
 			return True
 		return False
@@ -79,7 +85,7 @@ class Chat(Base, FieldMixin):
 	telegram_id = Column(Integer, unique=True, nullable=False)
 
 	def get_tags(self):
-		return list(map(lambda user: user.telegram_id, self.left))
+		return list(map(lambda user: user.telegram, self.left))
 
 	@classmethod
 	def from_telegram(cls, telegram_id: int):
@@ -92,8 +98,8 @@ class Chat(Base, FieldMixin):
 			chat = chat[0]
 		return chat
 
-	def __contains__(self, item):
-		return item in self.left
+	def __contains__(self, user):
+		return user in self.left
 
 	def __repr__(self):
 		id = self.id
@@ -103,42 +109,52 @@ class Chat(Base, FieldMixin):
 
 class User(Base, FieldMixin):
 	__tablename__ = "user"
+	__table_args__ = (
+		CheckConstraint("(username IS NOT NULL AND password IS NOT NULL) OR telegram IS NOT NULL"),
+	)
+
+	REASONS = {False: {9: 'you must leave team at first', 1: 'team with this name already exists'}, True: 'team created succesfully'}
 
 	id = Column(Integer, primary_key=True)
-	username = Column(String(32), nullable=True, unique=True)
-	password = Column(String(64), nullable=True)
-	telegram_id = Column(Integer, nullable=True, unique=True)
+	username = Column(String(32), unique=True)
+	password = Column(String(64))
+	telegram = Column(Integer, unique=True)
 	status = Column(Integer, CheckConstraint("0 <= status <= 3"), default=0)
-	team_id = Column(Integer, ForeignKey("team.id"), nullable=True)
-	steam_id = Column(String(17), nullable=True, unique=True)
+	team_id = Column(ForeignKey('team.id'), nullable=True)
 
-	team = relationship(Team, foreign_keys=[team_id], backref="members")
-	left_tags = relationship(Chat, secondary=left_tags, foreign_keys=[left_tags.c.chat_id, left_tags.c.user_id], backref="left", lazy="dynamic")
+	team = relationship(Team, foreign_keys=[team_id], backref="teammates")
+	left_tags = relationship(Chat, secondary="chat_tags", primaryjoin="and_(chat_tags.c.chat_id == Chat.id, chat_tags.c.left == True)", backref="left", lazy='dynamic')
 
 	def set_password(self, password: str):
-		self.password = kdf(password=bytes(password), **kdf_settings)
+		self.password = kdf(password=bytes(password.encode()), **kdf_settings)
+		return True
 
 	def check_password(self, password: str):
-		return self.password == kdf(password=bytes(password), **kdf_settings)
+		return self.password == kdf(password=bytes(password.encode()), **kdf_settings)
 
 	def join_team(self, team: "Team"):
-		team.add_user(self)
+		if self.team_id == None:
+			self.team_id = team.id
+			session.commit()
 		return self
 
 	def leave_team(self):
-		self.team_id = None
-		session.commit()
+		if self.team_id != None:
+			self.team_id = None
+			session.commit()
 		return self
 
 	def create_team(self, name: str):
 		if self.team_id != None:
-			return False
-		team = Team(name=name, owner=self.id)
+			return False, 0
+		elif len(Team.search(name)) > 0:
+			return False, 1
+		team = Team(name=name, captain=self.id)
 		session.add(team)
 		session.commit()
 		self.team_id = team.id
 		session.commit()
-		return True
+		return True,
 
 	def leave_chat_tag(self, chat: Union[Chat, int]):
 		if isinstance(chat, Chat) and chat not in self.left_tags:
@@ -158,21 +174,6 @@ class User(Base, FieldMixin):
 			return self.add_chat_tag(Chat.from_telegram(chat))
 		return False
 
-	@property
-	def token(self):
-		return encode({"id": self.id, "username": self.username, "exp": datetime.utcnow() + timedelta(minutes=1)}, kdf_settings["salt"], algorithm="HS256")
-
-	@classmethod
-	def from_token(cls, token: str):
-		try:
-			payload = decode(token, kdf_settings["salt"], algorithms=["HS256"])
-		except jwt.exceptions.ExpiredSignatureError:
-			return False
-		user = cls.from_field('username', payload['username'])
-		if len(user) == 0:
-			return False
-		return user[0]
-
 	@classmethod
 	def from_telegram(cls, telegram_id: int):
 		user = cls.from_field('telegram_id', telegram_id)
@@ -181,14 +182,32 @@ class User(Base, FieldMixin):
 			session.add(user)
 			session.commit()
 		else:
-			user = user[0]
+			user = user.first()
 		return user
+
+	@property
+	def token(self):
+		return encode({"id": self.id, "username": self.username, "exp": datetime.utcnow() + _month}, kdf_settings["salt"], algorithm="HS256")
+
+	@classmethod
+	def from_token(cls, token: str = '', refresh: bool = False):
+		try:
+			payload = decode(token, kdf_settings["salt"], leeway=timedelta(days=1), algorithms=["HS256"])
+		except exceptions.ExpiredSignatureError:
+			if not refresh:
+				return False
+		except:
+			return False
+		user = cls.from_field('username', payload['username'])
+		if len(user) == 0:
+			return False
+		return user[0]
 
 	@classmethod
 	def from_username(cls, username: str | None = None, password: str | None = None, **kwargs):
 		username = username or kwargs.pop('username', '')
 		password = password or kwargs.pop('password', '')
-		assert len(username) > 0 and len(password) > 0
+		assert len(username) > 0 and len(password) >= 0
 		user = cls.from_field('username', username)
 		if len(user) == 0:
 			user = cls(username=username)
@@ -200,52 +219,28 @@ class User(Base, FieldMixin):
 			user = user[0]
 			if user.check_password(password):
 				return user
-		return None
-
 
 	def __repr__(self):
 		id = self.id
-		username = self.username
 		current_team = getattr(self.team, 'name', None)
-		return f"<User {id=}, {username=}, {current_team=}>"
-
-
-class Category(Base):
-	__tablename__ = "settings_category"
-	id = Column(Integer, primary_key=True)
-	name = Column(String, unique=True)
-
-
-class Parameter(Base):
-	__tablename__ = "settings_parameter"
-	id = Column(Integer, primary_key=True)
-	name = Column(String, unique=True)
-	value = Column(String, nullable=False)
-	category_id = Column(Integer, ForeignKey('settings_category.id'), nullable=False)
-
-	category = relationship(Category, backref="parameters")
-
-
-def authorized(func: Function):
-	async def wrapper(request):
-		try:
-			request.user = User.from_token(request.session)
-		except:
-			return web.HTTPUnauthorized()
-		return await func(request)
-
-	return wrapper
+		return f"<User {id=}, {current_team=}>"
 
 
 def update_status(admins: list[int]):
+	session.query(User).filter(User.status==3).update({User.status: 0})
 	for admin_id in admins:
 		admin = User.from_telegram(admin_id)
 		admin.status = 3
-
-	session.query(User).filter(User.status==3, User.telegram_id.not_in(admins)).update({User.status: 0})
 	session.commit()
+
+
+# @middleware
+# async def auth_middleware(request, handler):
+# 	request.user = User.from_token(request.session)
+# 	if not request.user:
+# 		request.session = ''
+# 	return await handler(request)
 
 
 if __name__ == '__main__':
 	metadata.create_all(engine)
-	session.commit()

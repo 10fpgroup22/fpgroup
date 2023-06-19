@@ -17,7 +17,7 @@ Function = Union[Callable, Coroutine]
 logger = logging.Logger('minilib.logger')
 c = logging.StreamHandler()
 c.setFormatter(logging.Formatter(
-	fmt="[%(asctime)s %(filename)s:%(lineno)s %(levelname)s] %(message)s",
+	fmt="[%(asctime)s %(levelname)s] %(message)s",
 	datefmt="%H:%M:%S %d.%m.%y"
 ))
 logger.addHandler(c)
@@ -78,6 +78,10 @@ class Executor:
 		self._max_workers = max_workers
 		self.initialize()
 		atexit.register(self.shutdown)
+
+	@property
+	def max_workers(self):
+		return self._max_workers
 
 	def initialize(self):
 		if bool(self):
@@ -179,17 +183,24 @@ class Executor:
 
 		return results if len(results) > 1 else results[0]
 
-
 	__call__ = run
 
 	def __bool__(self):
-		return len(self._workers) > 0 and len(self._workers) >= self._max_workers
+		return len(self._workers) >= self._max_workers
 
 	def __enter__(self):
 		return self.initialize()
 
 	def __exit__(self, *args):
 		self.shutdown()
+
+	async def _wait_for_empty_queue(self):
+		while not self._queue.empty():
+			pass
+		return {'status': 'success', 'message': 'all functions started'}
+
+	def __await__(self):
+		return self._wait_for_empty_queue.__await__()
 
 	async def __aenter__(self):
 		return self.__enter__()
@@ -202,9 +213,10 @@ _global_executor = Executor()
 build = Executor.build
 
 
-def init(max_workers: int = 8):
+def init(max_workers: int = _global_executor.max_workers):
 	global _global_executor
-	_global_executor = Executor(max_workers=max_workers)
+	if max_workers != _global_executor.max_workers:
+		_global_executor = Executor(max_workers=max_workers)
 	return _global_executor
 
 
@@ -238,17 +250,20 @@ def get_pattern(string):
 		pattern += f"{re.escape(string[last:match.start()])}(." + ("{" + l + "})" if l > 1 else "+)")
 		last = match.end()
 	pattern += re.escape(string[last:])
-	del l, last
+	del last
 	return pattern
 
 
 class Dispatcher:
 	_events: dict[str, set[Function]] = {"*": set()}
 	_patterns: dict[str, re.Pattern] = {"*": re.compile(get_pattern("*"))}
+	_executor: Executor = _global_executor
 
-	def __init__(self, *dispatchers: Iterable[tuple[str, Iterable[Function]]]):
+	def __init__(self, *dispatchers: Iterable[tuple[str, Iterable[Function]]], max_workers: int = _global_executor.max_workers):
 		if dispatchers:
 			self.add_events(dispatchers)
+		if max_workers != self._executor.max_workers:
+			self._executor = Executor(max_workers=max_workers)
 
 	def add_events(self, *dispatchers: Iterable[tuple[str, Iterable[Function]]]):
 		for dispatcher in dispatchers:
@@ -256,14 +271,17 @@ class Dispatcher:
 				self.add_event(event, funcs)
 
 	def add_event(self, event: str, funcs: Union[Function, Iterable[Function]]):
-		ev = self._events.setdefault(event, set())
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
-		ev.update(funcs)
+		assert len(funcs) > 0, "the 'funcs' argument should not be empty"
+		_funcs = set(filter(lambda f: not hasattr(f, '_infinite'), funcs))
+		assert len(_funcs) > 0, "the 'funcs' argument should not only consist of infinite functions"
+		ev = self._events.setdefault(event, set())
+		ev.update(_funcs)
 		ptr = get_pattern(event)
 		if ptr != event:
 			self._patterns.setdefault(event, re.compile(ptr))
 		del ptr
-		return type(funcs)(map(_repr_, funcs))
+		return type(funcs)(map(_repr_, _funcs))
 
 	def on(self, event_or_func: Optional[Union[str, Function]], *, can_be_called: bool = True):
 		def wrapper(func: Function):
@@ -291,6 +309,9 @@ class Dispatcher:
 
 		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper(event_or_func)
 
+	event = lambda self, f: self.on(f)
+	event.__name__ = '<event>'
+
 	def dispatch(self, event: str, *args, **kwargs):
 		funcs = self._events.get(event, set()).copy()
 		patterned = set()
@@ -299,11 +320,14 @@ class Dispatcher:
 			if m:
 				patterned.update([m.group(1)])
 				funcs.update(self._events.get(ev))
-		if len(patterned) > 1:
+		if len(funcs) == 0:
+			del patterned, funcs
+			return
+		elif len(patterned) > 1:
 			patterned.discard(event)
 		patterned = list(patterned)
-		kwargs["patterned"] = patterned if len(patterned) > 1 else patterned.pop(0)
-		return run(funcs, args, kwargs)
+		kwargs["patterned"] = patterned.pop(0) if len(patterned) == 1 else patterned
+		return self._executor(funcs, *args, **kwargs)
 
 	def dispatcher(self, event_or_func: Optional[Union[str, Function]], *, dispatcher_first: bool = True):
 		def wrapper(func: Function):
@@ -312,12 +336,12 @@ class Dispatcher:
 			if dispatcher_first:
 				name = func.__name__
 				def wrapped(*args, **kwargs):
-					kwargs[f"{name}__args"] = run(func, args, kwargs)
-					return (kwargs[f"{name}__args"], self.dispatch(event, args, kwargs))
+					kwargs[f"{name}__args"] = self._executor(func, *args, **kwargs)
+					return (kwargs[f"{name}__args"], self.dispatch(event, *args, **kwargs))
 			else:
 				def wrapped(*args, **kwargs):
-					kwargs[f"{event}__args"] = self.dispatch(event, args, kwargs)
-					return (run(func, args, kwargs), kwargs[f"{event}__args"])
+					kwargs[f"{event}__args"] = self.dispatch(event, *args, **kwargs)
+					return (self._executor(func, *args, **kwargs), kwargs[f"{event}__args"])
 
 			if inspect.iscoroutinefunction(func):
 				async def _wrapped_(*args, **kwargs):
@@ -346,9 +370,9 @@ class Dispatcher:
 
 	def __format__(self, spec: str):
 		if spec in ['e', 'events']:
-			return ' ; '.join(self._events.keys())
+			return '\n'.join(self._events.keys())
 		elif spec in ['p', 'ptr', 'patterns']:
-			return ' ; '.join(self._patterns.keys())
+			return '\n'.join(self._patterns.keys())
 
 		return repr(self)
 
@@ -406,12 +430,4 @@ class Loader:
 
 
 if __name__ == '__main__':
-	@infinite
-	async def test():
-		print("test1")
-		test.stop()
-
-	async def test_with_args(*args):
-		print(*args)
-
-	run([test, test_with_args])
+	pass

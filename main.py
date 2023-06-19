@@ -1,6 +1,5 @@
 import re
 
-from database import *
 from random import choice
 from utils import *
 
@@ -12,25 +11,25 @@ async def admin_group_handler(_, msg):
     update_status(admins)
 
 
-@tg.on_message(filters.service & ~filters.private & ~filters.chat("fpg_tournament"), group=-1)
+@tg.on_message(filters.service & ~filters.private & ~filters.chat("ACL_esports"), group=-1)
 async def group_handler(_, msg):
     try:
         await msg.delete()
     except err.RPCError as rpc:
-        print(f"Occurred <{rpc}>")
+        print(f"<{rpc}>")
 
 
 @tg.on_message(filters.chat("acl_chat") & filters.new_chat_members)
 async def new_chat_member(_, msg):
     welcome = await tg.send_message(
         msg.chat.id,
-        f"Давайте поприветствуем нового участника нашей группы - " + msg.from_user.mention(msg.from_user.first_name)
+        f"Віддаймо вітання новому учаснику нашої групи - " + msg.from_user.mention(msg.from_user.first_name)
     )
     minilib.run(run_func, welcome.delete)
     try:
         await tg.send_message(
             msg.from_user.id,
-            f"Приветствую тебя в нашей группе, {msg.from_user.first_name}!\n👇Для начала рекомендую прочитать Правила группы👇",
+            f"Вітаю тебе в нашій групі, {msg.from_user.first_name}!\n👇Для початку рекомендую ознайомитися з Правилами групи👇",
             reply_markup=types.InlineKeyboardMarkup(markups["rules"][1])
         )
     except err.RPCError as rpc:
@@ -49,12 +48,12 @@ async def all_group(_, msg: types.Message):
     elif msg.sender_chat:
         member = True
 
-    if (msg.from_user and msg.from_user.id in admins) or msg.sender_chat \
+    if (msg.from_user and msg.from_user.id in admins) \
         or (member and getattr(member, 'status', enums.ChatMemberStatus.ADMINISTRATOR) in [enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]):
         chat = Chat.from_telegram(msg.chat.id).get_tags()
         await tg.send_message(
             msg.chat.id,
-            "Брат, я тебя призываю\n" +
+            "Брате, я тебе призиваю\n" +
             "".join([m.user.mention(getattr(emoji, choice(emojis), '🫥'))
                      async for m in msg.chat.get_members() if m.user.id not in chat and not m.user.is_bot])
         )
@@ -70,14 +69,15 @@ async def leave_tag_all(_, msg):
     try:
         user = User.from_telegram(msg.from_user.id)
         if user.left_chat_tag(msg.chat.id):
-            text = "Теперь в этой группе я тебя не отмечу"
+            text = "Тепер я не відмічу тебе в цій групі."
         else:
-            text = "Я итак тебя не отмечаю"
+            text = "Я вже і так не відмічаю тебе."
     except err.RPCError as rpc:
         if msg.sender_chat:
-            text = "Так как ты являешся --анонимным-- администратором, я не могу отметить тебя"
+            text = "Оскільки ти є --анонімним-- адміністратором, я не можу мене відмітити."
         else:
-            text = "Что-то пошло не так. Попробуй позже"
+            text = "Щось пішло не так. Спробуй пізніше"
+            print(f"<{rpc}>")
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
@@ -87,14 +87,15 @@ async def add_tag_all(_, msg):
     try:
         user = User.from_telegram_id(msg.from_user.id)
         if user.add_chat_tag(msg.chat.id):
-            text = "С этого момента я буду отмечать тебя в группе"
+            text = "Відтепер я буду відмічати тебе в групі."
         else:
-            text = "Я итак отмечаю тебя в группе, не спамь пожалуйста"
+            text = "Я так само відмічаю тебе в групі, будь ласка, не спамуй."
     except err.RPCError as rpc:
         if msg.sender_chat:
-            text = "Я не могу тебя отметить в группе, т.к. ты - анонимный администратор"
+            text = "Я не можу відмітити тебе в групі, оскільки ти - анонімний адміністратор"
         else:
-            text = "Что-то пошло не так. Попробуй позже"
+            text = "Щось пішло не так. Спробуй пізніше"
+            print(f"<{rpc}>")
 
     minilib.run(run_func, (await msg.reply(text)).delete, msg.delete)
 
@@ -110,7 +111,7 @@ async def callback_query(_, qry):
     if qry.data == "tournir":
         verified = [False, False]
 
-        for x, chat in enumerate(["fpg_chat", "fpg_tournament"]):
+        for x, chat in enumerate(["acl_chat", "ACL_esports"]):
             try:
                 verified[x] = (await tg.get_chat_member(chat, user.id)).status not in [enums.ChatMemberStatus.LEFT, enums.ChatMemberStatus.BANNED]
             except err.RPCError as rpc:
@@ -120,7 +121,7 @@ async def callback_query(_, qry):
             url = settings.get("Турнир", "Ссылка")
             if url:
                 markup = [
-                    [types.InlineKeyboardButton("Регистрация", url=url)],
+                    [types.InlineKeyboardButton("Реєстрація", url=url)],
                     [types.InlineKeyboardButton("Правила", url="https://telegra.ph/Pravila-turnira-01-03")]
                 ]
             else:
@@ -128,8 +129,6 @@ async def callback_query(_, qry):
         else:
             caption = captions["subscribe"]
             markup = list(filter(bool, map(lambda x: (None if x[1] else markups["subscribe"][x[0]]), enumerate(verified))))
-
-        markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
     elif qry.data == "social":
         markup = [
             [types.InlineKeyboardButton(txt, url=url)]
@@ -137,6 +136,9 @@ async def callback_query(_, qry):
         ]
 
         markup.append([types.InlineKeyboardButton("<< Назад", callback_data="info")])
+
+    if qry.data in ["tournir", "rules"]:
+        markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
 
     if bool(markup) and isinstance(markup, list):
         markup = types.InlineKeyboardMarkup(markup)

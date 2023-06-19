@@ -1,12 +1,10 @@
 import asyncio
 import minilib
 
-from discord import Client as DSClient, Intents, File
 from os import getenv
 from pyrogram import Client as TGClient, errors as err, enums, filters
 
-
-tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""), max_concurrent_transmissions=4)
+tg = TGClient("main_bot", api_id=getenv("API_ID", ""), api_hash=getenv("API_HASH", ""), bot_token=getenv("TOKEN", ""))
 
 from config import *
 from database import *
@@ -40,9 +38,6 @@ async def run_func(*funcs, timeout=30):
 
 
 async def start():
-    from server import run
-    app = await run()
-    app['telegram'] = tg
     await tg.start()
 
     while True:
