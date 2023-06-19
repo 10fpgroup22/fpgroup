@@ -56,8 +56,7 @@ markups = {
     ],
     "rules": [
         [types.InlineKeyboardButton("📋Правила турниру📋", url=settings.get("Правила", "Турнира"))],
-        [types.InlineKeyboardButton("📋Правила групи📋", url=settings.get("Правила", "Группы"))],
-        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
+        [types.InlineKeyboardButton("📋Правила групи📋", url=settings.get("Правила", "Группы"))]
     ],
     "rights": [
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
