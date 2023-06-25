@@ -101,7 +101,7 @@ async def add_tag_all(_, msg):
 
 @tg.on_callback_query()
 async def callback_query(_, qry):
-	photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, []).copy()
+	photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
 	msg, user = qry.message, qry.from_user
 
 	if qry.data == 'tournir':
@@ -147,11 +147,14 @@ async def callback_query(_, qry):
 	#         pass
 	#     return
 
-	if qry.data in ["tournir", "rules", "info", "rights"]:
-		markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
+	if isinstance(markup, list):
+		markup = markup.copy()
 
-	if bool(markup) and isinstance(markup, list):
-		markup = types.InlineKeyboardMarkup(markup)
+		if qry.data in ["tournir", "rules", "info", "rights"]:
+			markup.append([types.InlineKeyboardButton("<< Назад", callback_data="menu")])
+
+		if bool(markup):
+			markup = types.InlineKeyboardMarkup(markup)
 
 	await edit_photo(
 		msg, photo, caption,
