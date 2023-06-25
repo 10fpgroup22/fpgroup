@@ -10,40 +10,40 @@ from config import *
 from database import *
 
 with tg:
-    global admins
-    me = tg.get_me()
-    admins = [mbr.user.id for mbr in tg.get_chat_members(group_id) if not mbr.user.is_bot]
-    update_status(admins)
-    print(f"@{me.username} started")
+	global admins
+	me = tg.get_me()
+	admins = [mbr.user.id for mbr in tg.get_chat_members(group_id) if not mbr.user.is_bot]
+	update_status(admins)
+	print(f"@{me.username} started")
 
 
 async def edit_photo(msg, photo="", caption="", reply_markup=None):
-    try:
-        return await msg.edit_media(types.InputMediaPhoto(media=photo, caption=caption), reply_markup=reply_markup)
-    except err.RPCError as e:
-        print("Something where occurred:", e)
-        return msg
+	try:
+		return await msg.edit_media(types.InputMediaPhoto(media=photo, caption=caption), reply_markup=reply_markup)
+	except err.RPCError as e:
+		print("Something where occurred:", e)
+		return msg
 
 
 async def run_func(*funcs, timeout=30):
-    await asyncio.sleep(timeout)
-    result = []
-    try:
-        for func in funcs:
-            result.append(await func())
-    except BaseException as e:
-        print("Something went wrong:", e)
+	await asyncio.sleep(timeout)
+	result = []
+	try:
+		for func in funcs:
+			result.append(await func())
+	except BaseException as e:
+		print("Something went wrong:", e)
 
-    return result
+	return result
 
 
 async def start():
-    await tg.start()
+	await tg.start()
 
-    while True:
-        await asyncio.sleep(.1)
-        with open(join(sdir, f"../{tg.name}.json"), 'w', encoding="utf-8") as file:
-            dump({"settings": settings, "chats": chats, "games": games},
-                 file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
+	while True:
+		await asyncio.sleep(.1)
+		with open(join(sdir, f"../{tg.name}.json"), 'w', encoding="utf-8") as file:
+			dump({"settings": settings, "chats": chats, "games": games},
+				 file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
-    await tg.stop()
+	await tg.stop()

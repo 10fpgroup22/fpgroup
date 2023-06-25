@@ -203,11 +203,11 @@ class CombinationManager(Loader):
 
 	@staticmethod
 	def pairs(cards: list[Card]):
-	    c = CombinationManager._count(cards)
-	    if len(c) >= 2:
-	        return 2, c[-2:]
-	    elif len(c) == 1:
-	        return 1, c
+		c = CombinationManager._count(cards)
+		if len(c) >= 2:
+			return 2, c[-2:]
+		elif len(c) == 1:
+			return 1, c
 		del c
 
 	@staticmethod
