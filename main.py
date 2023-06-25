@@ -101,7 +101,7 @@ async def add_tag_all(_, msg):
 
 @tg.on_callback_query()
 async def callback_query(_, qry):
-	photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, [])
+	photo, caption, markup = photos.get(qry.data, photos["menu"]), captions.get(qry.data, ""), markups.get(qry.data, []).copy()
 	msg, user = qry.message, qry.from_user
 
 	if qry.data == 'tournir':
