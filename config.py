@@ -85,5 +85,5 @@ reply = {
 			[photos.get(menu, None), captions.get(menu, ""), markups.get(menu, None)]
 		) if v
 	}
-	for menu in set(markups.keys() + captions.keys() + photos.keys())
+	for menu in set([*markups.keys(), *captions.keys(), *photos.keys()])
 }
