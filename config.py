@@ -11,7 +11,7 @@ feedback_bot_username = "ACL_feed_Bot"
 group_id = -722067196
 
 try:
-	with open(join(sdir, f'../{tg.name}.json'), 'r', encoding='utf-8') as fl:
+	with open(join(sdir, '..', f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
 		dt = load(fl)
 		chats, games = dt.get('chats', {}), dt.get('games', {})
 		settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
