@@ -42,7 +42,7 @@ async def start():
 
 	while True:
 		await asyncio.sleep(.1)
-		with open(join(sdir, f"../{tg.name}.json"), 'w', encoding="utf-8") as file:
+		with open(join(sdir, '..', f'{tg.name}.json'), 'w', encoding="utf-8") as file:
 			dump({"settings": settings, "chats": chats, "games": games},
 				 file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)
 
