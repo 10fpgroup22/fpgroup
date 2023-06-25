@@ -5,17 +5,20 @@ from pyrogram import types, emoji
 from utils import tg
 
 sdir = abspath(dirname(__file__))
+channel_name = "ACL_esports"
+channel_chat_name = "acl_chat"
+feedback_bot_username = "ACL_feed_Bot"
 group_id = -722067196
 
 try:
-    with open(join(sdir, f'{tg.name}.json'), 'r', encoding='utf-8') as fl:
+    with open(join(sdir, f'../{tg.name}.json'), 'r', encoding='utf-8') as fl:
         dt = load(fl)
-        chats = dt.get('chats', {})
+        chats, games = dt.get('chats', {}), dt.get('games', {})
         settings = Settings.load(dt.get('settings', {'_': 'Settings'}))
 except (IOError, JSONDecodeError):
     print("Settings were not loaded, created new")
     settings = Settings()
-    chats = {}
+    chats, games = {}, {}
 
 emojis = list(filter(lambda x: not x.startswith('_'), dir(emoji)))
 
@@ -27,18 +30,14 @@ captions = {
                "P.S. Натискаючи копку 'Реєстрація', Ви погоджуєтесь з правилами нашої організації",
     "no_tournir": "На даний момент немає ніяких турнірів. Зачекайте ще трохи, скоро його буде анонсовано...",
     "info": "Знайдіть та прочитайте інформацію, що вас інтерисує. Якцо не знайдете такої,"
-            "то звертайтеся до нього => [зворотній зв'язок](https://t.me/fpgfeedBot)",
-    "subscribe": "Для того щоб брати участь у турнірі труба бути підписаним на:"
+           f"то звертайтеся до нього => [зворотній зв'язок](https://t.me/{feedback_bot_username})",
+    "subscribe": "Для того щоб брати участь у турнірі треба бути підписаним на:",
+    "join": "Підтвердіть участь у грі натисканням кнопки 'Підтвердити'"
 }
 
 photos = {
-    "menu": join(sdir, '_menu.png'),
-    "rules": join(sdir, '_rules.png'),
-    "rights": join(sdir, '_rights.png'),
-    "tournir": join(sdir, '_tournir.png'),
-    "social": join(sdir, '_social.jpg'),
-    # "settings": join(sdir, '_settings.png'),
-    "info": join(sdir, '_info.png')
+    fname: join(sdir, f'_{fname}.png')
+    for fname in ["menu", "rules", "rights", "tournir", "social", "info"]
 }
 
 markups = {
@@ -47,7 +46,7 @@ markups = {
         [types.InlineKeyboardButton("💸Привілегії💸", callback_data="rights"),
          types.InlineKeyboardButton("📋Правила📋", callback_data="rules")],
         [types.InlineKeyboardButton("ℹІнформаціяℹ", callback_data="info"),
-         types.InlineKeyboardButton("Задати питання⁉️", url="https://t.me/ACL_feed_Bot")],
+         types.InlineKeyboardButton("Задати питання⁉️", url=f"https://t.me/{feedback_bot_username}")],
         [types.InlineKeyboardButton("Підтримати нас", callback_data="help_us")]
     ]),
     "help_us": [
@@ -55,26 +54,36 @@ markups = {
         [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
     ],
     "rules": [
-        [types.InlineKeyboardButton("📋Правила турниру📋", url=settings.get("Правила", "Турнира"))],
-        [types.InlineKeyboardButton("📋Правила групи📋", url=settings.get("Правила", "Группы"))]
+        [types.InlineKeyboardButton("📋Правила групи📋", url=settings.get("Правила", "Группы"))],
+        # [types.InlineKeyboardButton("📋Правила ігор📋", callback_data="games_rules")]
     ],
-    "rights": [
-        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
-    ],
-    "info": [
-        [types.InlineKeyboardButton("Ми в соц. мережах", callback_data="social")],
-        [types.InlineKeyboardButton("<< Назад", callback_data="menu")]
-    ],
+    "info": [[types.InlineKeyboardButton("Ми в соц. мережах", callback_data="social")]],
     "subscribe": [
-        [types.InlineKeyboardButton("💬Наш чат💬", url=settings.get("Соц.сети", "📨Чат"))],
-        [types.InlineKeyboardButton("Телеграм канал", url="https://t.me/fpg_tournament")]
+        [types.InlineKeyboardButton("💬Наш чат💬", url=f"https://t.me/{channel_chat_name}")],
+        [types.InlineKeyboardButton("Телеграм канал", url=f"https://t.me/{channel_name}")]
+    ],
+    "games": [
+        [types.InlineKeyboardButton("Покер", callback_data="g_poker")],
+        [types.InlineKeyboardButton("Скасувати", callback_data="cancel")]
+    ],
+    "g_poker": [
+        [types.InlineKeyboardButton("Холдем", callback_data="holdem"),
+         types.InlineKeyboardButton("Омаха", callback_data="omaha")],
+        [types.InlineKeyboardButton("<< Назад", callback_data="games")]
+    ],
+    "join": [
+        [types.InlineKeyboardButton("Підтвердити", callback_data="ajoin"),
+         types.InlineKeyboardButton("Відхилити", callback_data="djoin")]
     ]
 }
 
 reply = {
     menu: {
-        "photo": photos.get(menu, join(sdir, '_menu.png')),
-        **{k: v for k, v in zip(["caption", "reply_markup"], [captions.get(menu, ""), markups.get(menu, None)]) if v}
+        k: v
+        for k, v in zip(
+            ["photo", "caption", "reply_markup"],
+            [photos.get(menu, None), captions.get(menu, ""), markups.get(menu, None)]
+        ) if v
     }
-    for menu in ["menu", "help_us", "rules", "rights", "tournir", "no_tournir", "info", "social", "settings"]
+    for menu in set(markups.keys() + captions.keys() + photos.keys())
 }

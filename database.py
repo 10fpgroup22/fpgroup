@@ -9,7 +9,7 @@ from typing import Union, Any
 
 __all__ = ["Team", "User", "Chat", "session", "update_status"]
 
-engine = create_engine("sqlite:///bot.db")
+engine = create_engine("sqlite:///../main.db")
 metadata = MetaData()
 Base = base(metadata=metadata)
 session = sessionmaker(bind=engine)()
@@ -82,16 +82,17 @@ class Chat(Base, FieldMixin):
 	__tablename__ = "chat"
 
 	id = Column(Integer, primary_key=True)
-	telegram_id = Column(Integer, unique=True, nullable=False)
+	telegram = Column(Integer, unique=True, nullable=False)
 
-	def get_tags(self):
+	@property
+	def tags(self):
 		return list(map(lambda user: user.telegram, self.left))
 
 	@classmethod
-	def from_telegram(cls, telegram_id: int):
-		chat = cls.from_field('telegram_id', telegram_id)
+	def from_telegram(cls, telegram: int):
+		chat = cls.from_field('telegram', telegram)
 		if len(chat) == 0:
-			chat = cls(telegram_id=telegram_id)
+			chat = cls(telegram=telegram)
 			session.add(chat)
 			session.commit()
 		else:
@@ -103,8 +104,8 @@ class Chat(Base, FieldMixin):
 
 	def __repr__(self):
 		id = self.id
-		telegram_id = self.telegram_id
-		return f"<Chat {id=}, {telegram_id}>"
+		telegram = self.telegram
+		return f"<Chat {id=}, {telegram}>"
 
 
 class User(Base, FieldMixin):
@@ -113,7 +114,7 @@ class User(Base, FieldMixin):
 		CheckConstraint("(username IS NOT NULL AND password IS NOT NULL) OR telegram IS NOT NULL"),
 	)
 
-	REASONS = {False: {9: 'you must leave team at first', 1: 'team with this name already exists'}, True: 'team created succesfully'}
+	REASONS = {False: {0: 'you must leave team at first', 1: 'team with this name already exists'}, True: 'team created succesfully'}
 
 	id = Column(Integer, primary_key=True)
 	username = Column(String(32), unique=True)
@@ -175,10 +176,10 @@ class User(Base, FieldMixin):
 		return False
 
 	@classmethod
-	def from_telegram(cls, telegram_id: int):
-		user = cls.from_field('telegram_id', telegram_id)
+	def from_telegram(cls, telegram: int):
+		user = cls.from_field('telegram', telegram)
 		if len(user) == 0:
-			user = cls(telegram_id=telegram_id)
+			user = cls(telegram=telegram)
 			session.add(user)
 			session.commit()
 		else:

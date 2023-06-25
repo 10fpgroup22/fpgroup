@@ -17,7 +17,7 @@ class Card(Loader):
 		return self._value >> 2
 
 	@rank.setter
-	def rank(self, rank):
+	def rank(self, rank: int | str):
 		if isinstance(rank, str) and rank in self.RANKS.values():
 			rank = [k for k, v in self.RANKS.items() if rank == v][0]
 		if isinstance(rank, int) and rank in self.RANKS:
@@ -28,14 +28,14 @@ class Card(Loader):
 		return self._value & 3
 
 	@suit.setter
-	def suit(self, suit):
+	def suit(self, suit: int | str):
 		if isinstance(rank, str) and rank in self.SUITS.values():
 			suit = [k for k, v in self.SUITS.items() if suit == v][0]
 		if isinstance(suit, int) and suit in self.SUITS:
 			self._value = (self.rank << 2) + suit
 
 	def __hash__(self):
-		return int(self)
+		return self._value
 
 	def __lt__(self, other: "Card"):
 		return int(self) < int(other)
@@ -70,6 +70,7 @@ class Cards(Loader):
 		self._counter = random.randint(0, 10240)
 
 	def shuffle(self):
+		random.seed(self._counter)
 		for rank in list(Card.RANKS.keys())[-(self._cards_count // 4):]:
 			for suit in Card.SUITS:
 				card = Card(rank, suit)
@@ -77,7 +78,6 @@ class Cards(Loader):
 					self._cards.append(card)
 					continue
 				del card
-		random.seed(self._counter)
 		random.shuffle(self._cards)
 
 		return self
@@ -96,6 +96,9 @@ class Cards(Loader):
 	def __str__(self):
 		return ','.join(self._cards)
 
+	def __int__(self):
+		return self._counter
+
 	def __contains__(self, card: Card):
 		if isinstance(card, Card):
 			return card in self._cards
@@ -110,12 +113,18 @@ class Cards(Loader):
 
 class Player(Loader):
 	__fields__ = {"user_id": "_user_id", "username": "username", "cards": "cards", "combination": "combination"}
+	__players__: dict[int, "Player"] = {}
 
-	def __init__(self, user_id: int, username: str | None = None):
+	def __new__(cls, user_id: int):
+		if user_id in cls.__players__:
+			return cls.__players__[user_id]
+		return cls.__init__(user_id, username)
+
+	def __init__(self, user_id: int):
 		self._user_id = user_id
-		self.username = username
 		self._cards = []
 		self.combination = tuple()
+		Player.players[user_id] = self
 
 	@property
 	def cards(self):
@@ -123,7 +132,7 @@ class Player(Loader):
 
 	@cards.setter
 	def cards(self, cards: list[Card]):
-		self._cards = sorted(set(cards), key=lambda c: (c.rank, c.suit))
+		self._cards = sorted(set(cards), key=lambda c: int(c))
 
 	def reset(self):
 		self._cards = []
@@ -136,6 +145,9 @@ class Player(Loader):
 		return self.combination[index]
 
 	def __int__(self):
+		return self._user_id
+
+	def __hash__(self):
 		return self._user_id
 
 	def __str__(self):
@@ -156,16 +168,16 @@ class Player(Loader):
 
 class CombinationManager(Loader):
 	COMBINATIONS = {
-		0: '{0:r} is highest card',
-		1: 'Pair on {0:r}',
-		2: 'Two pairs on {0:r} and {1:r}',
-		3: 'Three of a kind on {0:r}',
-		4: 'Straight to {0:r}',
-		5: 'Flush with highest card {0:r}',
-		6: 'Full house on {0:r} and {1:r}',
-		7: 'Four of a kind on {0:r}',
-		8: 'Straight flush to {0:r}',
-		9: 'Royale Straight flush'
+		0: '{0:r} - найвища карта',
+		1: 'Пара {0:r}',
+		2: 'Дві пари з {0:r} и {1:r}',
+		3: 'Сет з {0:r}',
+		4: 'Стріт до {0:r}',
+		5: 'Флеш з найвищою картою {0:r}',
+		6: 'Фул хаус з {0:r} і {1:r}',
+		7: 'Каре {0:r}',
+		8: 'Стріт-флеш до {0:r}',
+		9: 'Роял-флеш'
 	}
 
 	__fields__ = {"table_cards": "table_cards"}
@@ -191,11 +203,11 @@ class CombinationManager(Loader):
 
 	@staticmethod
 	def pairs(cards: list[Card]):
-		c = CombinationManager._count(cards)
-		if len(c) == 1:
-			return 1, c
-		elif len(c) >= 2:
-			return 2, c[-2:]
+	    c = CombinationManager._count(cards)
+	    if len(c) >= 2:
+	        return 2, c[-2:]
+	    elif len(c) == 1:
+	        return 1, c
 		del c
 
 	@staticmethod
@@ -273,8 +285,7 @@ class CombinationManager(Loader):
 				combination = 0, [cards[-1]]
 		if as_string:
 			return self.from_combination(combination)
-		else:
-			return combination
+		return combination
 
 	@staticmethod
 	def from_combination(combination: tuple[int, list[Card]]):
@@ -299,18 +310,29 @@ class CombinationManager(Loader):
 
 
 class PokerManager(Dispatcher, Loader):
+	max_players: int = 10
+
 	__fields__ = {"players": "_players", "combination_manager": "_combination_manager", "paused": "_pause", "started": "_start", "deck": "_deck", "decks": "_decks"}
+	__games__: dict[int, "PokerManager"] = {}
 
 	_combination_manager = CombinationManager()
 
-	def __init__(self, players: list[dict[int, str]]):
-		assert 2 <= len(players) <= 9
+	def __new__(cls, players: list[int], chat_id: int | None = None):
+		if chat_id and chat_id in cls.__games__:
+			return cls.__games__[chat_id].set_players(players)
+		return cls.__init__(players, chat_id)
+
+	def __init__(self, players: list[int] | None = None, chat_id: int | None = None):
+		assert 2 <= len(players) <= 10
 		super().__init__()
-		self.start = self.dispatcher(self.start)
-		self._players = [Player(id, name) if name else Player(id) for plrs in players for id, name in plrs.items()]
-		self._decks = [Cards(cards_count=52), Cards(cards_count=52), Cards(cards_count=52)]
+		self._chat_id = chat_id
+		self._players = []
+		self._decks = [Cards(cards_count=52).shuffle(), Cards(cards_count=52).shuffle(), Cards(cards_count=52).shuffle()]
 		self._pause = False
 		self._start = False
+		self.start = self.dispatcher(self.start)
+		if players:
+			self.set_players(players)
 
 	@property
 	def started(self):
@@ -328,10 +350,19 @@ class PokerManager(Dispatcher, Loader):
 	def table_cards(self, cards: list[Card]):
 		self._combination_manager.table_cards = cards
 
-	def start(self):
+	def add_players(self, *players: int):
 		assert not self._start, "Game already started"
+		self._players = list(set(self._players + [Player(id) for id in set(players)]))[:self.max_players]
+		return self
+
+	def set_players(self, players: list[int]):
+		assert not self._start, "Game already started"
+		self._players = [Player(id) for id in set(players)]
+		return self
+
+	def start(self):
+		assert not self._start and 2 <= len(self._players) <= self.max_players, "Game already started or not enough players"
 		self._deck = self._decks.pop(0)
-		self._deck.shuffle()
 		self._start = True
 		self._pause = False
 
@@ -341,7 +372,7 @@ class PokerManager(Dispatcher, Loader):
 
 	def stop(self):
 		assert self._start, "Game can be stopped only if it is started"
-		self._decks.append(self._deck)
+		self._decks.append(self._deck.shuffle())
 		self._deck = None
 		self._start = False
 		self._pause = False
@@ -360,6 +391,8 @@ class PokerManager(Dispatcher, Loader):
 
 
 class Holdem(PokerManager):
+	max_players: int = 15
+
 	def player_gift(self):
 		assert self._start and not self._pause and len(self.table_cards) == 0, "Game is not started or paused"
 		for _ in range(2):
@@ -393,7 +426,22 @@ class Holdem(PokerManager):
 			for player in self.players[1:]:
 				w = self._combination_manager.compare(winner, player)
 				if not w:
-					random.seed(self._dec)
+					random.seed(int(self._deck))
 					w = random.choice([winner, player])
 				winner = w
 			return winner
+
+
+class Omaha(Holdem):
+	max_players: int = 10
+
+	def player_gift(self):
+		assert self._start and not self._pause and len(self.table_cards) == 0, "Game is not started or paused"
+		for _ in range(4):
+			for player in self.players:
+				if len(player) + 1 != _:
+					raise
+				player.cards.append(self._deck.pop())
+				player.combination = self._combination_manager.resolve_combination(player.cards)
+			self._deck.add(self._deck.pop())
+		return self._players

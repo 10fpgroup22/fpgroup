@@ -49,8 +49,7 @@ class Executor:
 			except StopInfinite:
 				if getattr(self.func, '_infinite', False):
 					raise
-				else:
-					raise AssertionError("'StopInfinite' exception used only for infinite functions")
+				raise AssertionError("'StopInfinite' exception used only for infinite functions")
 			except BaseException as e:
 				self.set_exception(e)
 			else:
@@ -87,7 +86,7 @@ class Executor:
 		if bool(self):
 			return self
 
-		for _ in range(max(self._max_workers - len(self._workers), 1)):
+		for _ in range(max(self._max_workers - len(self._workers) - 1, 1)):
 			worker = Thread(target=self._worker, daemon=True)
 			worker.start()
 			self._workers.add(worker)
@@ -224,13 +223,13 @@ def run(funcs: Union[Function, Iterable[Function]], *args, **kwargs):
 	return _global_executor(funcs, *args, **kwargs)
 
 
-def _stop():
+def _stop_():
 	raise StopInfinite()
 
 
 def infinite(func: Function):
 	func._infinite = True
-	func.stop = _stop
+	func.stop = _stop_
 	return func
 
 
