@@ -174,13 +174,25 @@ class CombinationManager(Loader):
 		3: 'Сет з {0:r}',
 		4: 'Стріт до {0:r}',
 		5: 'Флеш з найвищою картою {0:r}',
-		6: 'Фул хаус з {0:r} і {1:r}',
+		6: 'Фул-Хаус з {0:r} і {1:r}',
 		7: 'Каре {0:r}',
 		8: 'Стріт-флеш до {0:r}',
-		9: 'Роял-флеш'
+		9: 'Роял-стріт-флеш'
 	}
 
 	__fields__ = {"table_cards": "table_cards"}
+	description: str = (
+		"Список комбінацій від найнижчої до найвищої:\n"
+		"1. \"Найвища карта\" - комбінація, що виникає за відсутності будь-якої іншої\n"
+		"2 та 3. \"Пара\" та \"Дві пари\" - складаються з 2 карт однакових за індексом, наприклад, 7♦-7♥\n"
+		"4. \"Сет\" - комбінація, що складається з 3 карт однакових за індексом, наприклад, 3♣-3♥-3♦\n"
+		"5. \"Стріт\" - послідовність з 5 карт, наприклад, 3♣-4♥-5♦-6♦-7♥\n"
+		"6. \"Флеш\" - 5 карт, однакових за мастю, наприклад, 5♣-2♣-9♣-10♣-А♣\n"
+		"7. \"Фул-Хаус\" - пара та сет, наприклад, 7♦-7♥ та 3♣-3♥-3♦\n"
+		"8. \"Каре\" - 4 карти з однаковим інденсом, наприклад, 5♣-5♥-5♦-5♠\n"
+		"9. \"Стріт-Флеш\" - послідовність з 5 карт з однаковою мастю, наприклад, А♦-2♦-3♦-4♦-5♦\n"
+		"10. \"Роял-Стріт-Флеш\" - стріт-флеш вигляду 10♦-J♦-Q♦-K♦-A♦, їх всього 4 може бути, найвищий з мастю ♠"
+	)
 
 	def __init__(self, table_cards: list[Card] | None = None):
 		self._table_cards = table_cards or []
@@ -314,6 +326,12 @@ class PokerManager(Dispatcher, Loader):
 
 	__fields__ = {"players": "_players", "combination_manager": "_combination_manager", "paused": "_pause", "started": "_start", "deck": "_deck", "decks": "_decks"}
 	__games__: dict[int, "PokerManager"] = {}
+	description: str = (
+		"--Основні правила--: гра складається з чотирьох етапів: роздача карт гравцям і 3 "
+		"роздачі карт на стіл 3-1-1 карти відповідно. Після кожного етапу можна зробити "
+		"ставку, мінімальна ставка - найвища ставка цього етапу або 10 фішок (валюта покеру)."
+		"Виграє той, у кого комбінація вище."
+	)
 
 	_combination_manager = CombinationManager()
 
@@ -350,14 +368,37 @@ class PokerManager(Dispatcher, Loader):
 	def table_cards(self, cards: list[Card]):
 		self._combination_manager.table_cards = cards
 
+	def add_player(self, player: int):
+		assert not self._start, "Game already started"
+		player = Player(player)
+		if len(self._players) < self.max_players and player not in self._players:
+			self._players.append(player)
+		return player in self._players
+
 	def add_players(self, *players: int):
 		assert not self._start, "Game already started"
-		self._players = list(set(self._players + [Player(id) for id in set(players)]))[:self.max_players]
+		for player in players:
+			self.add_player(player)
+		return self
+
+	def remove_player(self, player: int):
+		assert not self._start, "Game already started"
+		player = Player(player)
+		if player in self._players:
+			self._players.remove(player)
+		return player not in self._players
+
+	def remove_players(self, *players: int):
+		assert not self._start, "Game already started"
+		for player in players:
+			self.remove_player(player)
 		return self
 
 	def set_players(self, players: list[int]):
 		assert not self._start, "Game already started"
-		self._players = [Player(id) for id in set(players)]
+		self._players = []
+		for player in players:
+			self.add_player(player)
 		return self
 
 	def start(self):
@@ -383,6 +424,9 @@ class PokerManager(Dispatcher, Loader):
 	def table_gift(self):
 		raise NotImplemented
 
+	def __contains__(self, player: int):
+		return Player(player) in self._players
+
 	def __len__(self):
 		return len(self._players)
 
@@ -392,6 +436,7 @@ class PokerManager(Dispatcher, Loader):
 
 class Holdem(PokerManager):
 	max_players: int = 15
+	description: str = "Холдем (англ. Holdem) - тип покеру, у якому у гравця - 2 карти, на столі 5."
 
 	def player_gift(self):
 		assert self._start and not self._pause and len(self.table_cards) == 0, "Game is not started or paused"
@@ -434,6 +479,7 @@ class Holdem(PokerManager):
 
 class Omaha(Holdem):
 	max_players: int = 10
+	description: str = "Омаха (англ. Omaha) - тип покеру, у якому у гравця - 4 карти, на столі теж 5."
 
 	def player_gift(self):
 		assert self._start and not self._pause and len(self.table_cards) == 0, "Game is not started or paused"

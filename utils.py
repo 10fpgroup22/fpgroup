@@ -20,8 +20,8 @@ with tg:
 async def edit_photo(msg, photo="", caption="", reply_markup=None):
 	try:
 		return await msg.edit_media(types.InputMediaPhoto(media=photo, caption=caption), reply_markup=reply_markup)
-	except err.RPCError as e:
-		print("Something where occurred:", e)
+	except err.RPCError as rpc:
+		print(f"<ChatError(chat_id={msg.chat.id}, title='{msg.chat.title}'): {rpc}>")
 		return msg
 
 
@@ -41,7 +41,7 @@ async def start():
 	await tg.start()
 
 	while True:
-		await asyncio.sleep(.1)
+		await asyncio.sleep(1)
 		with open(join(sdir, '..', f'{tg.name}.json'), 'w', encoding="utf-8") as file:
 			dump({"settings": settings, "chats": chats, "games": games},
 				 file, default=lambda o: getattr(o, '__dict__', None), ensure_ascii=False, indent=4)

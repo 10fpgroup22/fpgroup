@@ -40,21 +40,44 @@ async def new_chat_member(_, msg):
 
 @tg.on_message(filters.private & filters.command('start'))
 async def start_private(_, msg):
-	# if chats[str(msg.chat.id)].startswith('choose_'):
-	#     pass
-	# elif chats[str(msg.chat.id)].startswith('join_'):
-	#     pass
+	if str(msg.chat.id) in chats and chats[str(msg.chat.id)].startswith(('choose_', 'join_')):
+		action, _ = chats[str(msg.chat.id)].split('_')
+		return await tg.send_message(msg.chat.id, **reply[action].replace(caption="text"))
 	await tg.send_photo(msg.chat.id, **reply["menu"])
 
 
-# @tg.on_message(filters.group & filters.command(['game', f'game@{me.username}']))
-# async def game_command(_, msg):
-#     pass
+@tg.on_message(filters.group & filters.command(['game', f'game@{me.username}']))
+async def game_command(_, msg):
+	if in_dev:
+		dev = await msg.reply("Ця функція ще не розроблена, спробуйте пізніше")
+		return
+
+	chats[str(msg.from_user.id)] = f"choose_{msg.chat.id}"
+	mention = msg.from_user.mention(msg.from_user.first_name)
+	status = await msg.reply(**reply["choose_status"].format(mention).replace(caption="text"))
+	for _ in range(300):
+		await asyncio.sleep(1)
+		if str(msg.chat.id) in games:
+			break
+	else:
+		await status.edit(f"На жаль, {mention} не встиг обрати гру за 5 хвилин, тому її було скасовано")
+		await info.delete()
+		return minilib.run(run_func, msg.delete, status.delete)
+
+	if games[str(msg.chat.id)] == "cancel":
+		del games[str(msg.chat.id)]
+		await status.edit(f"{mention} скасував гру")
+		return minilib.run(run_func, msg.delete, status.delete)
 
 
 @tg.on_message(filters.group & filters.command(['all', f'all@{me.username}']))
 async def all_group(_, msg: types.Message):
-	if msg.from_user and msg.from_user.id in admins:
+	try:
+		group_admin = (await tg.get_chat_member(msg.chat.id, msg.from_user.id)).status in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]
+	except:
+		group_admin = False
+
+	if msg.from_user and (msg.from_user.id in admins or group_admin):
 		chat = Chat.from_telegram(msg.chat.id).tags
 		await tg.send_message(
 			msg.chat.id,
@@ -133,19 +156,42 @@ async def callback_query(_, qry):
 
 		markup.append([types.InlineKeyboardButton("<< Назад", callback_data="info")])
 
-	# elif qry.data == 'join':
-		# chats[str(user.id)] = f"join_{msg.chat.id}"
-		# await tg.send_message(user.id, caption, reply_markup=markup)
-		# return await qry.answer(url=f"t.me/{me.username}")
-	# if qry.data.startswith(("holdem", "omaha")):
-	#     games[chats[str(user.id)]] = getattr(globals(), qry.data.capitalize(), Holdem)().add_players(user.id)
-	#     return await msg.delete()
-	# elif qry.data.endswith('join') and len(qry.data) == 5 and chats[user.id].startswith('join_') and chats[user.id][5:] in games and len(games[chats[user.id]][5:]) < 15:
-	#     if qry.data == "ajoin":
-	#         pass
-	#     elif qry.data == "djoin":
-	#         pass
-	#     return
+	elif qry.data == "choose":
+		if str(user.id) in chats and str(msg.chat.id) == chats[str(user.id)].split('_')[1]:
+			await qry.answer(url=f"t.me/{me.username}?start=1")
+		else:
+			await qry.answer("На жаль, обирати гру маєш не ти", show_alert=True)
+		return
+
+	elif qry.data == 'join':
+		chats[str(user.id)] = f"join_{msg.chat.id}"
+		return await qry.answer(url=f"t.me/{me.username}?start=1")
+
+	elif qry.data in ["holdem", "omaha", "cancel"] and str(user.id) in chats and chats[str(user.id)].startswith('choose_'):
+		_, chat_id = chats[str(user.id)].split('_')
+		if qry.data == "cancel":
+			games[chat_id] = "cancel"
+		else:
+			games.setdefault(chat_id, getattr(globals(), qry.data.capitalize(), Holdem)()).add_player(user.id)
+		del chats[str(user.id)]
+	
+	elif qry.data.endswith('join') and str(user.id) in chats and chats[str(user.id)].startswith('join_'):
+		_, chat_id = chats[str(user.id)].split('_')
+
+		if chat_id in games:
+			if qry.data == "ajoin" and games[chat_id].add_player(user_id):
+				await qry.answer("Ви успішно приєднались до гри", show_alert=True)
+			elif qry.data == "djoin" and user_id in games[chat_id]:
+				games[chat_id].remove_player(user_id)
+				await qry.answer("Ви від'єднались від гри", show_alert=True)
+			chats[str(user.id)] = f"game_{chat_id}"
+		elif chat_id not in games or qry.data == "djoin":
+			del chats[str(user.id)]
+
+	if qry.data in ["ajoin", "djoin", "holdem", "omaha", "cancel"]:
+		return await msg.delete()
+	elif qry.data in ["g_poker"]:
+		return await msg.edit(caption, reply_markup=markup)
 
 	if isinstance(markup, list):
 		markup = markup.copy()

@@ -4,6 +4,7 @@ import inspect
 import logging
 import re
 
+from collections import deque
 from concurrent.futures import Future, as_completed
 from json import loads
 from queue import Queue
@@ -49,11 +50,13 @@ class Executor:
 			except StopInfinite:
 				if getattr(self.func, '_infinite', False):
 					raise
-				raise AssertionError("'StopInfinite' exception used only for infinite functions")
+				self.set_exception(AssertionError("'StopInfinite' exception used only for infinite functions"))
 			except BaseException as e:
 				self.set_exception(e)
+				return e
 			else:
 				self.set_result(result)
+				return result
 
 		def reset(self):
 			self._state = "PENDING"
@@ -69,12 +72,15 @@ class Executor:
 
 	_queue: Queue = Queue()
 	_infinite: Queue = Queue()
+	_initialized: bool = False
 	_max_workers: int = 8
 	_workers: set[Thread] = set()
 
-	def __init__(self, *, max_workers: int = _max_workers):
-		assert max_workers > 0, "'max_workers' must more than zero"
+	def __init__(self, *, max_workers: int = _max_workers, timeout: float = 30):
+		assert max_workers > 1, "'max_workers' must more than one"
 		self._max_workers = max_workers
+		self._idle = [True] * (max_workers - 1)
+		self._timeout = timeout
 		self.initialize()
 		atexit.register(self.shutdown)
 
@@ -82,71 +88,78 @@ class Executor:
 	def max_workers(self):
 		return self._max_workers
 
+	@property
+	def timeout(self):
+		return self._timeout
+	
+	@timeout.setter
+	def timeout(self, value: float):
+		self._timeout = float(value)
+
 	def initialize(self):
 		if bool(self):
 			return self
 
-		for _ in range(max(self._max_workers - len(self._workers) - 1, 1)):
-			worker = Thread(target=self._worker, daemon=True)
+		for x in range(max(self.max_workers - len(self._workers), 2)):
+			buf = x == self.max_workers
+			if x < self.max_workers - 1:
+				self._idle[x] = True
+			worker = Thread(target=self._worker, args=(int(buf), x), daemon=True)
 			worker.start()
 			self._workers.add(worker)
 
-		worker = Thread(target=self._worker, args=(Executor.INFINITE,), daemon=True)
-		worker.start()
-		self._workers.add(worker)
+		self._initialized = True
 
 		return self
 
 	def shutdown(self, wait: bool = True):
 		assert bool(self), "Already shutdowned or not initialized yet"
+		self._initialized = False
 
 		if wait:
 			for t in self._workers:
-				t.join(timeout=1/(10 * self._max_workers))
+				t.join(timeout=1/self._max_workers)
 
 		self._workers.clear()
 
-	def _worker(self, worker_type: int = STANDART):
+		return self
+
+	def _worker(self, worker_type: int = STANDART, index: int = 0):
 		queue = self._infinite if worker_type == Executor.INFINITE else self._queue
+		cond = index < self.max_workers - 1
 		loop = asyncio.new_event_loop()
-		while True:
+		while self._initialized:
 			item = queue.get()
 			try:
 				item.run(loop)
 			except StopInfinite:
 				continue
-			if worker_type == Executor.INFINITE and item != None:
+			if worker_type == Executor.INFINITE:
 				queue.put(item.reset())
 		loop.close()
 
 	@staticmethod
-	def build(obj: Function, *args, **kwargs):
+	def build(obj: Function, *args, **kwargs) -> list[Function, deque, dict]:
 		spec = inspect.getfullargspec(obj)
 		func = int(inspect.ismethod(obj) or inspect.isclass(obj))
 		kw, _args, _kwargs, _default = spec.kwonlydefaults or {}, spec.args or [], \
 									   spec.kwonlyargs or [], spec.defaults or []
 
-		ar = [
+		ar = deque(
 			kwargs.get(k, v) or d
 			for k, v, d in zip(
-				_args[func:],
-				list(args) + [None] * (len(_args) - len(args)),
+				_args[func:], list(args),
 				[None] * (len(_args) - len(_default) - func) + list(_default)
 			)
-		]
-		if spec.varargs:
-			ar += list(args[len(_args) - func:])
+		)
 
-		kw.update({
-			k: kwargs[k]
-			for k in _kwargs if k in kwargs
-		})
+		if spec.varargs and len(args) - func > len(_args):
+			ar.extend(args[len(_args) - func:])
+
+		kw.update({k: v for k, v in kwargs.items() if k in _kwargs})
+
 		if spec.varkw:
-			kw.update({
-				k: kwargs[k]
-				for k in kwargs.keys()
-				if k not in _args
-			})
+			kw.update({k: v for k, v in kwargs.items() if k not in _args})
 
 		del spec, func, _args, _kwargs, _default
 
@@ -162,30 +175,33 @@ class Executor:
 		return item
 
 	def run(self, funcs: Union[Function, Iterable[Function]], *args, **kwargs):
-		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
-		assert len(funcs) > 0 and bool(self)
-		items = list(filter(None, map(lambda fn: self._create_item(fn, *args, **kwargs), set(funcs))))
+		assert bool(self), "call .initialize() first"
+		funcs = set(funcs if isinstance(funcs, Iterable) else [funcs])
+		assert len(funcs) > 0, "the 'funcs' argument should not be empty"
+		items = list(filter(None, map(lambda fn: self._create_item(fn, *args, **kwargs), funcs)))
 
 		if len(items) == 0:
+			del items, funcs
 			return
 
 		results = []
 
 		try:
 			for f in as_completed(items, timeout=30):
-				results.append((f.exception() or f.result(), f.func))
+				results.append((f.exception() or f.result(), f))
 		except TimeoutError:
-			res_funcs = list(map(lambda res: res[1], results))
-			for item in items:
-				if item.func not in res_funcs:
-					results.append((item, item.func))
+			fns = items - list(map(lambda res: res[1], results))
+			for item in fns:
+				results.append((item, item))
+
+		del items, funcs
 
 		return results if len(results) > 1 else results[0]
 
 	__call__ = run
 
 	def __bool__(self):
-		return len(self._workers) >= self._max_workers
+		return len(self._workers) == self._max_workers and self._initialized
 
 	def __enter__(self):
 		return self.initialize()
@@ -193,19 +209,22 @@ class Executor:
 	def __exit__(self, *args):
 		self.shutdown()
 
-	async def _wait_for_empty_queue(self):
-		while not self._queue.empty():
+	async def _wait_(self):
+		while not all(self._idle):
 			pass
-		return {'status': 'success', 'message': 'all functions started'}
+		return True
 
 	def __await__(self):
-		return self._wait_for_empty_queue.__await__()
+		return self._wait_().__await__()
 
 	async def __aenter__(self):
 		return self.__enter__()
 
 	async def __aexit__(self, *args):
 		self.__exit__(*args)
+
+	def __repr__(self):
+		return f'<{self.__class__.__name__} initialized={self._initialized} workers={len(self._workers)}>'
 
 
 _global_executor = Executor()
@@ -272,7 +291,7 @@ class Dispatcher:
 	def add_event(self, event: str, funcs: Union[Function, Iterable[Function]]):
 		funcs = funcs if isinstance(funcs, Iterable) else [funcs]
 		assert len(funcs) > 0, "the 'funcs' argument should not be empty"
-		_funcs = set(filter(lambda f: not hasattr(f, '_infinite'), funcs))
+		_funcs = set(filter(lambda f: not getattr(f, '_infinite', False), funcs))
 		assert len(_funcs) > 0, "the 'funcs' argument should not only consist of infinite functions"
 		ev = self._events.setdefault(event, set())
 		ev.update(_funcs)
@@ -297,14 +316,14 @@ class Dispatcher:
 				wrapped.__repr__ = func.__repr__
 
 				return wrapped
-			else:
-				def wrapped(*args, **kwargs):
-					return
 
-				wrapped.__name__ = func.__name__
-				wrapped.__repr__ = func.__repr__
+			def wrapped(*args, **kwargs):
+				return
 
-				return wrapped
+			wrapped.__name__ = func.__name__
+			wrapped.__repr__ = func.__repr__
+
+			return wrapped
 
 		return wrapper if isinstance(event_or_func, (str, type(None))) else wrapper(event_or_func)
 
@@ -398,7 +417,7 @@ class Loader:
 				if hasattr(obj, k):
 					dt = data.get(a, getattr(obj, k, None))
 					try:
-						if isinstance(dt, dict):
+						if isinstance(dt, (dict, str)):
 							dt = Loader.load(dt)
 						elif isinstance(dt, Iterable):
 							dt = type(dt)(map(Loader.load, dt))
@@ -429,4 +448,21 @@ class Loader:
 
 
 if __name__ == '__main__':
-	pass
+	async def test():
+		for x in range(20):
+			await asyncio.sleep(.1)
+			print(f"Iteration x={x + 1}: idle={_global_executor._idle}", flush=True)
+
+	async def test1():
+		print("test1", flush=True)
+		return await test()
+
+	async def test2():
+		print("test2", flush=True)
+		return await test()
+
+	async def main():
+		return await _global_executor
+
+	run([test, test1, test2])
+	print(asyncio.run(main()))
