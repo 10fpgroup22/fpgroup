@@ -163,10 +163,6 @@ async def callback_query(_, qry):
 			await qry.answer("На жаль, обирати гру маєш не ти", show_alert=True)
 		return
 
-	elif qry.data == 'join':
-		chats[str(user.id)] = f"join_{msg.chat.id}"
-		return await qry.answer(url=f"t.me/{me.username}?start=1")
-
 	elif qry.data in ["holdem", "omaha", "cancel"] and str(user.id) in chats and chats[str(user.id)].startswith('choose_'):
 		_, chat_id = chats[str(user.id)].split('_')
 		if qry.data == "cancel":
@@ -174,6 +170,10 @@ async def callback_query(_, qry):
 		else:
 			games.setdefault(chat_id, getattr(globals(), qry.data.capitalize(), Holdem)()).add_player(user.id)
 		del chats[str(user.id)]
+
+	elif qry.data == 'join':
+		chats[str(user.id)] = f"join_{msg.chat.id}"
+		return await qry.answer(url=f"t.me/{me.username}?start=1")
 	
 	elif qry.data.endswith('join') and str(user.id) in chats and chats[str(user.id)].startswith('join_'):
 		_, chat_id = chats[str(user.id)].split('_')

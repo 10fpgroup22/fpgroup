@@ -92,7 +92,7 @@ markups = {
 		 types.InlineKeyboardButton("Омаха", callback_data="omaha")],
 		[types.InlineKeyboardButton("<< Назад", callback_data="games")]
 	]),
-	"group_join": types.InlineKeyboardMarkup([[types.InlineKeyboardButton()]]),
+	"group_join": types.InlineKeyboardMarkup([[types.InlineKeyboardButton("Приєднатися", callback_data="join")]]),
 	"join": types.InlineKeyboardMarkup([
 		[types.InlineKeyboardButton("Підтвердити", callback_data="ajoin"),
 		 types.InlineKeyboardButton("Відхилити", callback_data="djoin")]
